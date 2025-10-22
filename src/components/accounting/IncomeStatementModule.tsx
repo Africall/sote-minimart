@@ -9,6 +9,7 @@ import { formatCurrency } from '@/utils/currencyFormat';
 import { DollarSign, Download, CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useReportExport } from '@/hooks/useReportExport';
 
 interface PLRow {
   section: string;
@@ -25,6 +26,7 @@ export const IncomeStatementModule: React.FC = () => {
     to: new Date(),
   });
   const { toast } = useToast();
+  const { exportReport, exporting } = useReportExport();
 
   useEffect(() => {
     loadPL();
@@ -97,9 +99,14 @@ export const IncomeStatementModule: React.FC = () => {
                 />
               </PopoverContent>
             </Popover>
-            <Button variant="outline" size="sm">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              disabled={exporting}
+              onClick={() => exportReport({ reportType: 'income_statement', format: 'excel' })}
+            >
               <Download className="h-4 w-4 mr-2" />
-              Export
+              {exporting ? 'Exporting...' : 'Export'}
             </Button>
           </div>
         </div>

@@ -9,6 +9,7 @@ import { formatCurrency } from '@/utils/currencyFormat';
 import { Receipt, Download, CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useReportExport } from '@/hooks/useReportExport';
 
 interface VATRow {
   side: string;
@@ -25,6 +26,7 @@ export const VATReturnModule: React.FC = () => {
     to: new Date(),
   });
   const { toast } = useToast();
+  const { exportReport, exporting } = useReportExport();
 
   useEffect(() => {
     loadVAT();
@@ -89,9 +91,14 @@ export const VATReturnModule: React.FC = () => {
                 />
               </PopoverContent>
             </Popover>
-            <Button variant="outline" size="sm">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              disabled={exporting}
+              onClick={() => exportReport({ reportType: 'vat_return', format: 'excel' })}
+            >
               <Download className="h-4 w-4 mr-2" />
-              Export
+              {exporting ? 'Exporting...' : 'Export'}
             </Button>
           </div>
         </div>

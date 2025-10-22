@@ -60,7 +60,7 @@ export const useReportExport = () => {
       const link = document.createElement('a');
       link.href = url;
       link.download = `${exportParams.reportType}_${new Date().toISOString().split('T')[0]}.${
-        exportParams.format === 'pdf' ? 'pdf' : 'xlsx'
+        exportParams.format === 'pdf' ? 'pdf' : 'csv'
       }`;
       
       // Trigger download
