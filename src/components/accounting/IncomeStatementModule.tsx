@@ -103,7 +103,7 @@ export const IncomeStatementModule: React.FC = () => {
               variant="outline" 
               size="sm" 
               disabled={exporting}
-              onClick={() => exportReport({ reportType: 'income_statement', format: 'pdf' })}
+              onClick={() => exportReport({ reportType: 'income_statement', format: 'excel' })}
             >
               <Download className="h-4 w-4 mr-2" />
               {exporting ? 'Exporting...' : 'Export'}
