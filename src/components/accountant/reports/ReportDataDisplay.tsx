@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Loader2, TrendingUp, TrendingDown, Package, AlertCircle } from 'lucide-react';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
-import { format } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';//here
 import { formatCurrency } from '@/utils/supabaseUtils';
 
 interface ReportDataDisplayProps {
@@ -21,6 +21,18 @@ interface ReportDataDisplayProps {
     endIndex: number;
     goToPage: (page: number) => void;
   };
+}
+
+function safeFormatDate(input: string | Date | null | undefined, fmt = 'MMM dd, yyyy') {
+  if (!input) return '—';
+  const d =
+    input instanceof Date
+      ? input
+      : typeof input === 'string'
+        ? parseISO(input)
+        : null;
+
+  return d && isValid(d) ? format(d, fmt) : '—';
 }
 
 const renderSalesTable = (data: any[]) => (
@@ -50,9 +62,7 @@ const renderSalesTable = (data: any[]) => (
                 <span className="font-medium">{sale.cashier_name || 'Unknown'}</span>
               </div>
             </TableCell>
-            <TableCell>
-              {format(new Date(sale.created_at), 'MMM dd, yyyy HH:mm')}
-            </TableCell>
+            <TableCell>{safeFormatDate(sale.created_at)}</TableCell>
             <TableCell>
               <Badge variant="outline">{sale.payment_method}</Badge>
             </TableCell>
@@ -90,9 +100,7 @@ const renderExpensesTable = (data: any[]) => (
             <TableCell>
               <Badge variant="outline">{expense.category}</Badge>
             </TableCell>
-            <TableCell>
-              {format(new Date(expense.expense_date), 'MMM dd, yyyy')}
-            </TableCell>
+            <TableCell>{safeFormatDate(expense.expense_date)}</TableCell>
             <TableCell>{expense.profiles?.name || 'System'}</TableCell>
             <TableCell className="text-right font-medium text-red-600">
               -{formatCurrency(Number(expense.amount) || 0)}

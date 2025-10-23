@@ -66,13 +66,14 @@ export const getPaginatedSales = async (
         payment_status,
         created_at,
         cashier_id,
-        profiles!sales_cashier_id_fkey(name)
+        profiles!fk_sales_profile(name)
       `, { count: 'exact' })
       .gte('created_at', startDate)
       .lte('created_at', endDate)
       .in('payment_status', ['completed', 'partially_paid'])
       .order('created_at', { ascending: false })
       .range(offset, offset + pagination.limit - 1);
+
 
     if (cashierId && cashierId !== 'all') {
       salesQuery = salesQuery.eq('cashier_id', cashierId);
