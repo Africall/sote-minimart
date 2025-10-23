@@ -296,7 +296,7 @@ const UserManagementPage: React.FC = () => {
                       required
                       className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
                     />
-                  </div>
+                  </div>//new
 
                   {!editingUser && (
                     <>
