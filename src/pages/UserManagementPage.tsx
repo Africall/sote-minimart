@@ -181,34 +181,67 @@ const UserManagementPage: React.FC = () => {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
-
     try {
+      console.log('[delete] start', { userId });
+
+      if (!userId) {
+        console.warn('[delete] missing userId');
+        toast.error('No user id provided');
+        return;
+      }
+
+      // If this logs, your click handler wiring is OK.
+      // If you see this log during render (not click), you’re calling the handler immediately.
+      const confirmed = confirm('Are you sure you want to delete this user?');
+      console.log('[delete] confirmed?', confirmed);
+      if (!confirmed) return;
+
       setLoading(true);
+      console.log('[delete] loading set');
 
-      const userToDelete = users.find((u) => u.id === userId);
+      const userToDelete = users?.find((u) => u.id === userId);
       const userName = userToDelete?.name || 'Unknown User';
+      console.log('[delete] userToDelete', userToDelete);
 
-      const { error: profileError } = await supabase.from('profiles').delete().eq('id', userId);
-      if (profileError) throw profileError;
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
 
-      await supabase.from('activities').insert({
+      if (profileError) {
+        console.error('[delete] profileError', profileError);
+        throw profileError;
+      }
+      console.log('[delete] profiles row deleted');
+
+      const { error: activityError } = await supabase.from('activities').insert({
         type: 'user_deleted',
         description: `User ${userName} was deleted`,
         product_name: 'User Management',
-        performed_by: profile?.id,
+        performed_by: profile?.id ?? null,
         date: new Date().toISOString(),
       });
 
+      if (activityError) {
+        console.error('[delete] activityError', activityError);
+        throw activityError;
+      }
+      console.log('[delete] activity logged');
+
       toast.success('User deleted successfully');
-      fetchUsers();
-      fetchActivities();
+
+      // Ensure the UI refreshes finish before clearing loading
+      await Promise.allSettled([fetchUsers?.(), fetchActivities?.()]);
+      console.log('[delete] lists refreshed');
     } catch (error) {
+      console.error('[delete] caught error', error);
       toast.error('Error deleting user: ' + (error as Error).message);
     } finally {
       setLoading(false);
+      console.log('[delete] done');
     }
   };
+
 
   const openEditDialog = (user: UserProfile) => {
     setEditingUser(user);
