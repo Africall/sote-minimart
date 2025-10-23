@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Card, CardContent, CardDescription, 
@@ -34,8 +34,10 @@ import { ProjectedCashFlow } from '@/components/accountant/ProjectedCashFlow';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { CashierSalesBreakdown } from '@/components/accountant/CashierSalesBreakdown';
 import { CashierProductSales } from '@/components/accountant/CashierProductSales';
+import { toast } from 'sonner';
 
 const ReportsPage = () => {
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | 'week' | 'month' | 'custom'>('today');
   const [customDateRange, setCustomDateRange] = useState<{
     from: Date | undefined;
@@ -112,11 +114,29 @@ const ReportsPage = () => {
           )}
           
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => window.dispatchEvent(new CustomEvent('report-export', { detail: { format: 'pdf' } }))}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (activeTab === 'reports') {
+                  window.dispatchEvent(new CustomEvent('report-export', { detail: { format: 'pdf' } }));
+                } else {
+                  toast.info('PDF export is only available in the Reports tab. Please switch to the Reports tab to export data.');
+                }
+              }}
+            >
               <Download className="mr-2 h-4 w-4" />
               Export PDF
             </Button>
-            <Button variant="outline" onClick={() => window.dispatchEvent(new CustomEvent('report-export', { detail: { format: 'excel' } }))}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (activeTab === 'reports') {
+                  window.dispatchEvent(new CustomEvent('report-export', { detail: { format: 'excel' } }));
+                } else {
+                  toast.info('Excel export is only available in the Reports tab. Please switch to the Reports tab to export data.');
+                }
+              }}
+            >
               <Download className="mr-2 h-4 w-4" />
               Export Excel
             </Button>
@@ -124,7 +144,7 @@ const ReportsPage = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="dashboard" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-5 mb-4">
           <TabsTrigger value="dashboard">
             <BarChart3 className="w-4 h-4 mr-2" />

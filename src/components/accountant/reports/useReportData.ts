@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { getPaginatedSales, getPaginatedExpenses, getLiveInventoryAnalytics } from '@/utils/reportUtils';
 import { usePagination } from '@/hooks/usePagination';
@@ -10,12 +9,20 @@ import 'jspdf-autotable';
 import { formatCurrency } from '@/utils/supabaseUtils';
 import { DateRange } from 'react-day-picker';
 
+type DateParams = { startDate: string; endDate: string };
+
+type PaginatedFn<T, A extends any[]> = (
+  pageArgs: { page: number; limit: number },
+  dateParams: DateParams,
+  ...args: A
+) => Promise<{ data: T[]; count: number }>;
+
 export const useReportData = () => {
   const [selectedReport, setSelectedReport] = useState<string>('sales');
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<any[]>([]);
   const [totalItems, setTotalItems] = useState(0);
-  const [dateRange, setDateRange] = useState('today');
+  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'custom'>('today');
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedCashier, setSelectedCashier] = useState('all');
   const [cashiers, setCashiers] = useState<Array<{ id: string; name: string }>>([]);
@@ -26,31 +33,25 @@ export const useReportData = () => {
     initialPage: 1
   });
 
-  const getDateRangeParams = () => {
+  // ---------- date helpers ----------
+  const getDateRangeParams = (): DateParams => {
     const today = new Date();
-    
-    // Use custom date range if available
+
     if (dateRange === 'custom' && customDateRange?.from && customDateRange?.to) {
       const startOfDay = new Date(customDateRange.from);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(customDateRange.to);
       endOfDay.setHours(23, 59, 59, 999);
-      return {
-        startDate: startOfDay.toISOString(),
-        endDate: endOfDay.toISOString()
-      };
+      return { startDate: startOfDay.toISOString(), endDate: endOfDay.toISOString() };
     }
-    
+
     switch (dateRange) {
       case 'today': {
         const startOfDay = new Date(today);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(today);
         endOfDay.setHours(23, 59, 59, 999);
-        return {
-          startDate: startOfDay.toISOString(),
-          endDate: endOfDay.toISOString()
-        };
+        return { startDate: startOfDay.toISOString(), endDate: endOfDay.toISOString() };
       }
       case 'week': {
         const startDate = new Date(today);
@@ -58,10 +59,7 @@ export const useReportData = () => {
         startDate.setHours(0, 0, 0, 0);
         const endOfDay = new Date(today);
         endOfDay.setHours(23, 59, 59, 999);
-        return {
-          startDate: startDate.toISOString(),
-          endDate: endOfDay.toISOString()
-        };
+        return { startDate: startDate.toISOString(), endDate: endOfDay.toISOString() };
       }
       case 'month': {
         const startDate = new Date(today);
@@ -69,32 +67,26 @@ export const useReportData = () => {
         startDate.setHours(0, 0, 0, 0);
         const endOfDay = new Date(today);
         endOfDay.setHours(23, 59, 59, 999);
-        return {
-          startDate: startDate.toISOString(),
-          endDate: endOfDay.toISOString()
-        };
+        return { startDate: startDate.toISOString(), endDate: endOfDay.toISOString() };
       }
       default: {
         const startOfDay = new Date(today);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(today);
         endOfDay.setHours(23, 59, 59, 999);
-        return {
-          startDate: startOfDay.toISOString(),
-          endDate: endOfDay.toISOString()
-        };
+        return { startDate: startOfDay.toISOString(), endDate: endOfDay.toISOString() };
       }
     }
   };
 
-  // Fetch cashiers for filtering
+  // ---------- fetch cashiers for filter ----------
   const fetchCashiers = async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, name')
         .eq('role', 'cashier');
-      
+
       if (error) throw error;
       setCashiers(data || []);
     } catch (error) {
@@ -102,13 +94,14 @@ export const useReportData = () => {
     }
   };
 
+  // ---------- page-limited fetch for the table ----------
   const fetchReportData = async () => {
     try {
       setLoading(true);
       const dateParams = getDateRangeParams();
-      
+
       switch (selectedReport) {
-        case 'sales':
+        case 'sales': {
           const salesResponse = await getPaginatedSales(
             { page: pagination.currentPage, limit: pagination.itemsPerPage },
             dateParams,
@@ -117,8 +110,8 @@ export const useReportData = () => {
           setReportData(salesResponse.data || []);
           setTotalItems(salesResponse.count || 0);
           break;
-          
-        case 'expenses':
+        }
+        case 'expenses': {
           const expensesResponse = await getPaginatedExpenses(
             { page: pagination.currentPage, limit: pagination.itemsPerPage },
             dateParams
@@ -126,22 +119,22 @@ export const useReportData = () => {
           setReportData(expensesResponse.data || []);
           setTotalItems(expensesResponse.count || 0);
           break;
-          
-        case 'stock':
+        }
+        case 'stock': {
           const inventoryData = await getLiveInventoryAnalytics();
           setReportData(inventoryData ? [inventoryData] : []);
           setTotalItems(inventoryData ? 1 : 0);
           break;
-          
-        default:
+        }
+        default: {
           console.warn('Unknown report type:', selectedReport);
           setReportData([]);
           setTotalItems(0);
+        }
       }
     } catch (error: any) {
       console.error('Error fetching report data:', error);
       toast.error('Failed to load report data');
-      // Set safe fallback values
       setReportData([]);
       setTotalItems(0);
     } finally {
@@ -149,96 +142,171 @@ export const useReportData = () => {
     }
   };
 
+  // ---------- fetch-all helpers for export ----------
+  async function fetchAllPages<T, A extends any[]>(
+    fn: PaginatedFn<T, A>,
+    dateParams: DateParams,
+    ...extraArgs: A
+  ): Promise<T[]> {
+    const pageSize = 1000; // big page to reduce round trips
+    let page = 1;
+    let total = 0;
+    const all: T[] = [];
+
+    // first page
+    const first = await fn({ page, limit: pageSize }, dateParams, ...extraArgs);
+    all.push(...(first.data || []));
+    total = first.count || all.length;
+
+    // remaining pages
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    for (page = 2; page <= totalPages; page++) {
+      const res = await fn({ page, limit: pageSize }, dateParams, ...extraArgs);
+      all.push(...(res.data || []));
+    }
+
+    return all;
+  }
+
+  async function fetchAllSales(dateParams: DateParams) {
+    return fetchAllPages(
+      getPaginatedSales,
+      dateParams,
+      selectedCashier === 'all' ? undefined : selectedCashier
+    );
+  }
+
+  async function fetchAllExpenses(dateParams: DateParams) {
+    return fetchAllPages(getPaginatedExpenses, dateParams);
+  }
+
+  // ---------- public actions ----------
   const handleGenerateReport = () => {
     fetchReportData();
     toast.success('Report generated successfully');
   };
 
-  const handleExport = (format: 'excel' | 'pdf') => {
-    if (reportData.length === 0) {
-      toast.error('No data to export');
-      return;
-    }
-
+  const handleExport = async (format: 'excel' | 'pdf') => {
     try {
-      if (format === 'excel') {
-        exportToExcel();
+      const dateParams = getDateRangeParams();
+
+      // Prepare full dataset (not paginated)
+      let allRows: any[] = [];
+      if (selectedReport === 'sales') {
+        allRows = await fetchAllSales(dateParams);
+      } else if (selectedReport === 'expenses') {
+        allRows = await fetchAllExpenses(dateParams);
+      } else if (selectedReport === 'stock') {
+        const one = await getLiveInventoryAnalytics();
+        allRows = one ? [one] : [];
       } else {
-        exportToPDF();
+        allRows = [];
       }
+
+      if (allRows.length === 0) {
+        toast.error('No data to export');
+        return;
+      }
+
+      if (format === 'excel') {
+        exportAllToExcel(selectedReport, allRows);
+      } else {
+        exportAllToPDF(selectedReport, allRows);
+      }
+
       toast.success(`Report exported as ${format.toUpperCase()}`);
     } catch (error) {
-      toast.error(`Failed to export report as ${format.toUpperCase()}`);
+      console.error(error);
+      toast.error('Failed to export report');
     }
   };
 
-  const exportToExcel = () => {
+  // ---------- exporters (use ALL rows passed in) ----------
+  function exportAllToExcel(report: string, rows: any[]) {
     let exportData: any[] = [];
-    
-    switch (selectedReport) {
+
+    switch (report) {
       case 'sales':
-        exportData = reportData.map(sale => ({
-          'Product Name': sale.product_name || 'Multiple Items',
-          'Cashier': sale.cashier_name || 'Unknown',
+        exportData = rows.map((sale) => ({
+          'Product Name': sale.product_name ?? 'Multiple Items',
+          'Cashier': sale.cashier_name ?? 'Unknown',
           'Date': new Date(sale.created_at).toLocaleString(),
-          'Payment Method': sale.payment_method,
-          'Status': sale.payment_status,
-          'Amount': sale.total_amount
+          'Payment Method': sale.payment_method ?? '',
+          'Status': sale.payment_status ?? '',
+          'Amount': sale.total_amount ?? 0
         }));
         break;
       case 'expenses':
-        exportData = reportData.map(expense => ({
-          'Title': expense.title,
-          'Category': expense.category,
-          'Date': new Date(expense.expense_date).toLocaleDateString(),
-          'Recorded By': expense.profiles?.name || 'System',
-          'Amount': expense.amount
+        exportData = rows.map((expense) => ({
+          'Title': expense.title ?? '',
+          'Category': expense.category ?? '',
+          'Date': expense.expense_date ? new Date(expense.expense_date).toLocaleDateString() : '',
+          'Recorded By': expense.profiles?.name ?? 'System',
+          'Amount': expense.amount ?? 0
         }));
         break;
+      case 'stock':
+        // Flatten/shape as you need for inventory analytics
+        exportData = rows;
+        break;
       default:
-        exportData = reportData;
+        exportData = rows;
     }
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, selectedReport);
-    XLSX.writeFile(wb, `${selectedReport}_report_${new Date().toISOString().split('T')[0]}.xlsx`);
-  };
+    XLSX.utils.book_append_sheet(wb, ws, report);
+    const fileDate = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `${report}_report_${fileDate}.xlsx`);
+  }
 
-  const exportToPDF = () => {
+  function exportAllToPDF(report: string, rows: any[]) {
     const doc = new jsPDF();
-    
-    // Add title
+
+    // Title
     doc.setFontSize(20);
-    doc.text(`${selectedReport.charAt(0).toUpperCase() + selectedReport.slice(1)} Report`, 20, 20);
-    
-    // Add date
+    doc.text(`${report.charAt(0).toUpperCase() + report.slice(1)} Report`, 20, 20);
+
+    // Generated time
     doc.setFontSize(12);
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 35);
-    
-    let tableData: any[] = [];
+
     let headers: string[] = [];
-    
-    switch (selectedReport) {
-      case 'sales':
+    let tableData: any[][] = [];
+
+    switch (report) {
+      case 'sales': {
         headers = ['Product Name', 'Cashier', 'Date', 'Payment Method', 'Amount'];
-        tableData = reportData.map(sale => [
-          sale.product_name || 'Multiple Items',
-          sale.cashier_name || 'Unknown',
-          new Date(sale.created_at).toLocaleDateString(),
-          sale.payment_method,
+        tableData = rows.map((sale) => [
+          sale.product_name ?? 'Multiple Items',
+          sale.cashier_name ?? 'Unknown',
+          sale.created_at ? new Date(sale.created_at).toLocaleDateString() : '',
+          sale.payment_method ?? '',
           formatCurrency(Number(sale.total_amount) || 0)
         ]);
         break;
-case 'expenses':
+      }
+      case 'expenses': {
         headers = ['Title', 'Category', 'Date', 'Amount'];
-        tableData = reportData.map(expense => [
-          expense.title,
-          expense.category,
-          new Date(expense.expense_date).toLocaleDateString(),
+        tableData = rows.map((expense) => [
+          expense.title ?? '',
+          expense.category ?? '',
+          expense.expense_date ? new Date(expense.expense_date).toLocaleDateString() : '',
           formatCurrency(Number(expense.amount) || 0)
         ]);
         break;
+      }
+      case 'stock': {
+        // Minimal example: print JSON lines; adapt to your stock columns as needed
+        headers = ['Field', 'Value'];
+        tableData = Object.entries(rows[0] || {}).map(([k, v]) => [k, String(v ?? '')]);
+        break;
+      }
+      default: {
+        // Fallback generic
+        headers = Object.keys(rows[0] || {});
+        tableData = rows.map((r) => headers.map((h) => r[h] ?? ''));
+      }
     }
 
     if (tableData.length > 0) {
@@ -250,29 +318,29 @@ case 'expenses':
         headStyles: { fillColor: [66, 139, 202] }
       });
     }
-    
-    doc.save(`${selectedReport}_report_${new Date().toISOString().split('T')[0]}.pdf`);
-  };
 
+    const fileDate = new Date().toISOString().split('T')[0];
+    doc.save(`${report}_report_${fileDate}.pdf`);
+  }
+
+  // ---------- effects ----------
   useEffect(() => {
     fetchCashiers();
   }, []);
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const fetchData = async () => {
-      if (isMounted) {
-        try {
-          await fetchReportData();
-        } catch (error) {
-          console.error('Error in fetchData effect:', error);
-        }
+      if (!isMounted) return;
+      try {
+        await fetchReportData();
+      } catch (error) {
+        console.error('Error in fetchData effect:', error);
       }
     };
-    
+
     fetchData();
-    
     return () => {
       isMounted = false;
     };
