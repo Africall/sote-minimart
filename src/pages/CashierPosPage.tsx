@@ -30,7 +30,6 @@ declare global {
   }
 }
 
-// Add this check at the top level of the file
 if (typeof window !== 'undefined' && window.ethereum) {
   window.ethereum.on('chainChanged', () => {
     window.location.reload();
@@ -58,63 +57,52 @@ const CashierPosPage = () => {
     refreshData: refreshCashData
   } = useCashManagement();
 
-  // Use custom hooks for state and handlers
+  // POS state & handlers
   const posState = usePosState();
   const { isActive: isShiftStarted, formattedTime: elapsedTime, startShift, endShift } = useShiftTimer();
   const { handleBarcodeInput, restoreTransaction, handleCheckout, syncOfflineTransactions } = usePosHandlers(processCashSale);
   const [activeTab, setActiveTab] = useState<'pos' | 'orders' | 'cash' | 'expenses'>('pos');
-  
-  // E-commerce orders data
+
+  // E-commerce orders
   const { totalPendingCount } = useEcommerceOrders();
 
-  // Real-time product updates
+  // Realtime products
   const handleProductUpdate = (updatedProduct: Product) => {
-    setProducts(prevProducts => {
-      if (!prevProducts) return prevProducts;
-      
-      return prevProducts.map(product => 
-        product.id === updatedProduct.id ? updatedProduct : product
-      );
-    });
-    
-    // Invalidate React Query cache to keep it in sync
+    setProducts(prev =>
+      prev ? prev.map(p => (p.id === updatedProduct.id ? updatedProduct : p)) : prev
+    );
     queryClient.invalidateQueries({ queryKey: ['quickItems'] });
   };
-
   const { isListening } = useRealtimeProducts(products, handleProductUpdate);
 
-  // Prefetch data on mount
+  // Prefetch
   useEffect(() => {
     prefetchQuickItems(queryClient);
     prefetchDailyStats(queryClient, profile?.id);
-    getAllProducts().then((fetchedProducts) => {
-      if (typeof fetchedProducts === 'string') {
-        toast.error('Error fetching products: ' + fetchedProducts);
-      } else {
-        setProducts(fetchedProducts);
-      }
-    }).catch((error) => {
-      toast.error('Error fetching products: ' + error.message);
-    });
+    getAllProducts()
+      .then((fetched) => {
+        if (typeof fetched === 'string') {
+          toast.error('Error fetching products: ' + fetched);
+        } else {
+          setProducts(fetched);
+        }
+      })
+      .catch((error) => toast.error('Error fetching products: ' + error.message));
   }, [queryClient, profile?.id]);
 
-  // Use React Query hooks with cashier ID
+  // React Query hooks
   const { data: quickItems = [] } = useQuickItems();
   const { data: dailyStats } = useDailyStats(profile?.id);
   const { data: heldTransactions = [] } = useHeldTransactions();
 
-  // Terminal and user info
+  // Terminal/user info
   const terminalInfo = {
     branch: profile?.branch || 'Main Branch',
     terminalId: profile?.terminal_id || 'POS-001',
     currentDate: new Date().toLocaleDateString(),
     currentTime: new Date().toLocaleTimeString()
   };
-
-  const user = {
-    name: profile?.name || 'Cashier'
-  };
-
+  const user = { name: profile?.name || 'Cashier' };
   const networkStatus = true;
 
   // Handlers with state integration
@@ -123,13 +111,11 @@ const CashierPosPage = () => {
   };
 
   const handleCheckoutWithState = async (paymentMethod: string, paymentDetails?: any) => {
-    if (isProcessingCheckout) return; // Prevent multiple clicks
-    
+    if (isProcessingCheckout) return;
     setIsProcessingCheckout(true);
     try {
       await handleCheckout(total, paymentMethod, paymentDetails);
       posState.setOpenCheckout(false);
-      // Invalidate daily stats to refresh totals
       queryClient.invalidateQueries({ queryKey: ['dailyStats', profile?.id] });
     } finally {
       setIsProcessingCheckout(false);
@@ -152,31 +138,35 @@ const CashierPosPage = () => {
     }
   };
 
-  // Checkout calculations - without VAT
+  // Totals (no VAT)
   const subtotal = cartItems.reduce((sum, item) => sum + (Number(item.sellingPrice) * item.quantity), 0);
   const discount = 0;
-  const tax = 0; // Remove VAT calculation
-  const total = subtotal - discount; // Total without VAT
+  const tax = 0;
+  const total = subtotal - discount;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
-      {/* Compact Header */}
-      <CompactPosHeader
-        user={user}
-        networkStatus={networkStatus}
-        isShiftStarted={isShiftStarted}
-        toggleShift={toggleShift}
-        elapsedTime={elapsedTime}
-        terminalInfo={terminalInfo}
-        showOrderManagement={posState.showOrderManagement}
-        setShowOrderManagement={posState.setShowOrderManagement}
-        isListening={isListening}
-        pendingOrderCount={totalPendingCount}
-      />
+    // <<< changed: from bg-gray-50 to the branded background + surfaced blocks
+    <div className="flex flex-col h-screen overflow-hidden page-bg">
+      {/* Header remains its own component; it will sit above the surfaced content nicely */}
+      <div className="page-surface mx-2 md:mx-3 mt-2 md:mt-3 rounded-xl">
+        <CompactPosHeader
+          user={user}
+          networkStatus={networkStatus}
+          isShiftStarted={isShiftStarted}
+          toggleShift={toggleShift}
+          elapsedTime={elapsedTime}
+          terminalInfo={terminalInfo}
+          showOrderManagement={posState.showOrderManagement}
+          setShowOrderManagement={posState.setShowOrderManagement}
+          isListening={isListening}
+          pendingOrderCount={totalPendingCount}
+        />
+      </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden flex">
-        <div className="flex-1">
+      <div className="flex-1 overflow-hidden flex gap-2 md:gap-3 p-2 md:p-3">
+        {/* Left: Sales area on an elevated surface */}
+        <div className="flex-1 overflow-hidden page-surface rounded-xl">
           <CompactPosLayout
             products={products || []}
             quickItems={quickItems}
@@ -194,90 +184,84 @@ const CashierPosPage = () => {
             showOrderManagement={posState.showOrderManagement}
             heldTransactions={heldTransactions}
             onHoldTransaction={() => {
-              // Refresh held transactions when a new one is added
-              if (queryClient) {
-                queryClient.invalidateQueries({ queryKey: ['heldTransactions'] });
-              }
+              queryClient.invalidateQueries({ queryKey: ['heldTransactions'] });
             }}
           />
         </div>
 
-        {/* Side Panel (Resizable) */}
+        {/* Right: Side Panel (when visible) */}
         {posState.showOrderManagement && (
-          <div className="min-w-80 max-w-96 w-80 border-l border-gray-200 bg-white overflow-hidden resize-x">
+          <div className="min-w-80 max-w-96 w-80 overflow-hidden resize-x page-surface rounded-xl">
             <div className="h-full flex flex-col">
-              {/* Tab Navigation */}
-              <div className="border-b border-gray-200">
+              {/* Tab Navigation with gradient strip */}
+              <div className="border-b">
+                <div className="h-1 w-full bg-gradient-to-r from-royal-blue-600 via-primary to-vibrant-red-500" />
                 <div className="flex">
                   <button
                     onClick={() => setActiveTab('orders')}
-                    className={`flex-1 px-3 py-2 text-sm font-medium border-b-2 relative ${
-                      activeTab === 'orders' 
-                        ? 'border-primary text-primary' 
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
+                    className={`flex-1 px-3 py-2 text-sm font-medium transition-colors rounded-t-md
+                      ${activeTab === 'orders'
+                        ? 'bg-white text-foreground shadow-inner'
+                        : 'text-muted-foreground hover:bg-muted/60'
+                      }`}
                   >
                     Orders
                     {totalPendingCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      <span className="ml-2 inline-flex items-center justify-center rounded-full bg-vibrant-red-600 text-white text-xs h-5 px-2">
                         {totalPendingCount}
                       </span>
                     )}
                   </button>
-                   <button
-                     onClick={() => setActiveTab('cash')}
-                     className={`flex-1 px-3 py-2 text-sm font-medium border-b-2 ${
-                       activeTab === 'cash' 
-                         ? 'border-primary text-primary' 
-                         : 'border-transparent text-gray-500 hover:text-gray-700'
-                     }`}
-                   >
-                     Cash
-                   </button>
-                   <button
-                     onClick={() => setActiveTab('expenses')}
-                     className={`flex-1 px-3 py-2 text-sm font-medium border-b-2 ${
-                       activeTab === 'expenses' 
-                         ? 'border-primary text-primary' 
-                         : 'border-transparent text-gray-500 hover:text-gray-700'
-                     }`}
-                   >
-                     Expenses
-                   </button>
+                  <button
+                    onClick={() => setActiveTab('cash')}
+                    className={`flex-1 px-3 py-2 text-sm font-medium transition-colors rounded-t-md
+                      ${activeTab === 'cash'
+                        ? 'bg-white text-foreground shadow-inner'
+                        : 'text-muted-foreground hover:bg-muted/60'
+                      }`}
+                  >
+                    Cash
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('expenses')}
+                    className={`flex-1 px-3 py-2 text-sm font-medium transition-colors rounded-t-md
+                      ${activeTab === 'expenses'
+                        ? 'bg-white text-foreground shadow-inner'
+                        : 'text-muted-foreground hover:bg-muted/60'
+                      }`}
+                  >
+                    Expenses
+                  </button>
                 </div>
               </div>
-              
+
               {/* Tab Content */}
               <div className="flex-1 overflow-auto p-3">
-                {activeTab === 'orders' && (
-                  <EcommerceOrdersPanel />
-                )}
-                 {activeTab === 'cash' && (
-                   <CashManagementPanel />
-                 )}
-                 {activeTab === 'expenses' && (
-                   <CashierExpenseForm />
-                 )}
+                {activeTab === 'orders' && <EcommerceOrdersPanel />}
+                {activeTab === 'cash' && <CashManagementPanel />}
+                {activeTab === 'expenses' && <CashierExpenseForm />}
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Compact Footer */}
-      <CompactDailyStats
-        dailyStats={dailyStats || {
-          totalSales: 0,
-          totalTransactions: 0,
-          averageTransaction: 0,
-          itemsSold: 0,
-          floatRemaining: 1000,
-          shiftStart: '',
-          shiftEnd: ''
-        }}
-        formatCurrency={formatCurrency}
-        setShowShortcuts={posState.setOpenShortcuts}
-      />
+      {/* Footer on surface */}
+      <div className="page-surface mx-2 md:mx-3 mb-2 md:mb-3 rounded-xl">
+        <CompactDailyStats
+          dailyStats={dailyStats || {
+            totalSales: 0,
+            totalTransactions: 0,
+            averageTransaction: 0,
+            itemsSold: 0,
+            floatRemaining: 1000,
+            shiftStart: '',
+            shiftEnd: ''
+          }}
+          formatCurrency={formatCurrency}
+          setShowShortcuts={posState.setOpenShortcuts}
+        />
+      </div>
 
       {/* Dialogs */}
       <PosDialogManager

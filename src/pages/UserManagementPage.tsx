@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,7 +32,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserRole } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
-import { Loader2, Plus, Edit2, Trash2, UserCog } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2 } from 'lucide-react';
 
 interface UserProfile {
   id: string;
@@ -69,28 +68,20 @@ const UserManagementPage: React.FC = () => {
   // Fetch users and their activities
   const fetchUsers = async () => {
     try {
-      console.log('Fetching users...');
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        throw profilesError;
-      }
-      
-      console.log('Fetched profiles:', profiles);
+      if (profilesError) throw profilesError;
       setUsers(profiles || []);
     } catch (error) {
-      console.error('Error in fetchUsers:', error);
       toast.error('Error fetching users: ' + (error as Error).message);
     }
   };
 
   const fetchActivities = async () => {
     try {
-      console.log('Fetching activities...');
       const { data, error } = await supabase
         .from('activities')
         .select(`
@@ -100,24 +91,19 @@ const UserManagementPage: React.FC = () => {
         .order('date', { ascending: false })
         .limit(100);
 
-      if (error) {
-        console.error('Error fetching activities:', error);
-        throw error;
-      }
-      
-      console.log('Fetched activities:', data);
-      
-      const formattedActivities = data?.map(activity => ({
-        id: activity.id,
-        date: activity.date,
-        description: activity.description,
-        type: activity.type,
-        performed_by_name: activity.profiles?.name || 'Unknown User'
-      })) || [];
-      
+      if (error) throw error;
+
+      const formattedActivities =
+        data?.map((activity: any) => ({
+          id: activity.id,
+          date: activity.date,
+          description: activity.description,
+          type: activity.type,
+          performed_by_name: activity.profiles?.name || 'Unknown User',
+        })) || [];
+
       setActivities(formattedActivities);
     } catch (error) {
-      console.error('Error in fetchActivities:', error);
       toast.error('Error fetching activities: ' + (error as Error).message);
     } finally {
       setLoading(false);
@@ -132,22 +118,17 @@ const UserManagementPage: React.FC = () => {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      console.log('Creating user with data:', formData);
       setLoading(true);
 
-      // Use the signup function from AuthContext instead of admin API
       await signup(formData.email, formData.password, formData.name, formData.role);
 
-      // Log user creation activity
-      await supabase
-        .from('activities')
-        .insert({
-          type: 'user_created',
-          description: `User ${formData.name} created with role ${formData.role}`,
-          product_name: 'User Management',
-          performed_by: profile?.id,
-          date: new Date().toISOString()
-        });
+      await supabase.from('activities').insert({
+        type: 'user_created',
+        description: `User ${formData.name} created with role ${formData.role}`,
+        product_name: 'User Management',
+        performed_by: profile?.id,
+        date: new Date().toISOString(),
+      });
 
       toast.success('User created successfully');
       setIsDialogOpen(false);
@@ -155,7 +136,6 @@ const UserManagementPage: React.FC = () => {
       fetchUsers();
       fetchActivities();
     } catch (error) {
-      console.error('Error creating user:', error);
       toast.error('Error creating user: ' + (error as Error).message);
     } finally {
       setLoading(false);
@@ -167,10 +147,8 @@ const UserManagementPage: React.FC = () => {
     if (!editingUser) return;
 
     try {
-      console.log('Updating user:', editingUser.id, 'with data:', formData);
       setLoading(true);
 
-      // Update profile
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
@@ -179,21 +157,15 @@ const UserManagementPage: React.FC = () => {
         })
         .eq('id', editingUser.id);
 
-      if (profileError) {
-        console.error('Error updating profile:', profileError);
-        throw profileError;
-      }
+      if (profileError) throw profileError;
 
-      // Log user update activity
-      await supabase
-        .from('activities')
-        .insert({
-          type: 'user_updated',
-          description: `User ${formData.name} updated (role: ${formData.role})`,
-          product_name: 'User Management',
-          performed_by: profile?.id,
-          date: new Date().toISOString()
-        });
+      await supabase.from('activities').insert({
+        type: 'user_updated',
+        description: `User ${formData.name} updated (role: ${formData.role})`,
+        product_name: 'User Management',
+        performed_by: profile?.id,
+        date: new Date().toISOString(),
+      });
 
       toast.success('User updated successfully');
       setIsDialogOpen(false);
@@ -202,7 +174,6 @@ const UserManagementPage: React.FC = () => {
       fetchUsers();
       fetchActivities();
     } catch (error) {
-      console.error('Error updating user:', error);
       toast.error('Error updating user: ' + (error as Error).message);
     } finally {
       setLoading(false);
@@ -213,40 +184,26 @@ const UserManagementPage: React.FC = () => {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      console.log('Deleting user:', userId);
       setLoading(true);
 
-      // Get user name before deletion
-      const userToDelete = users.find(u => u.id === userId);
+      const userToDelete = users.find((u) => u.id === userId);
       const userName = userToDelete?.name || 'Unknown User';
 
-      // Delete profile first
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
+      const { error: profileError } = await supabase.from('profiles').delete().eq('id', userId);
+      if (profileError) throw profileError;
 
-      if (profileError) {
-        console.error('Error deleting profile:', profileError);
-        throw profileError;
-      }
-
-      // Log user deletion activity
-      await supabase
-        .from('activities')
-        .insert({
-          type: 'user_deleted',
-          description: `User ${userName} was deleted`,
-          product_name: 'User Management',
-          performed_by: profile?.id,
-          date: new Date().toISOString()
-        });
+      await supabase.from('activities').insert({
+        type: 'user_deleted',
+        description: `User ${userName} was deleted`,
+        product_name: 'User Management',
+        performed_by: profile?.id,
+        date: new Date().toISOString(),
+      });
 
       toast.success('User deleted successfully');
       fetchUsers();
       fetchActivities();
     } catch (error) {
-      console.error('Error deleting user:', error);
       toast.error('Error deleting user: ' + (error as Error).message);
     } finally {
       setLoading(false);
@@ -257,107 +214,137 @@ const UserManagementPage: React.FC = () => {
     setEditingUser(user);
     setFormData({
       name: user.name,
-      email: '', // We don't show email in edit mode
-      password: '', // We don't show password in edit mode
+      email: '',
+      password: '',
       role: user.role,
     });
     setIsDialogOpen(true);
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">User Management</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingUser ? 'Edit User' : 'Add New User'}</DialogTitle>
-              <DialogDescription>
-                {editingUser
-                  ? 'Update user details below.'
-                  : 'Fill in the details to create a new user.'}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser}>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                {!editingUser && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select
-                    value={formData.role}
-                    onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="cashier">Cashier</SelectItem>
-                      <SelectItem value="inventory">Inventory Manager</SelectItem>
-                      <SelectItem value="accountant">Accountant</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+    <div className="space-y-6 animate-slide-up">
+      {/* Gradient header band */}
+      <div className="rounded-xl overflow-hidden shadow-elegant border border-blue-100">
+        <div className="bg-gradient-to-r from-royal-blue-600 to-primary/80 text-white px-6 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">User Management</h1>
+            <p className="opacity-90">Create, edit, and monitor user accounts</p>
+          </div>
+
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-to-r from-royal-blue-600 to-primary text-white hover:opacity-95">
+                <Plus className="mr-2 h-4 w-4" />
+                Add User
+              </Button>
+            </DialogTrigger>
+
+            {/* Dialog with gradient header + surfaced body */}
+            <DialogContent className="sm:max-w-[520px] rounded-2xl p-0 overflow-hidden">
+              <div className="bg-gradient-to-r from-royal-blue-600 to-primary text-white p-5">
+                <DialogHeader className="p-0">
+                  <DialogTitle className="text-base font-semibold">
+                    {editingUser ? 'Edit User' : 'Add New User'}
+                  </DialogTitle>
+                  <DialogDescription className="opacity-90">
+                    {editingUser ? 'Update user details below.' : 'Fill in the details to create a new user.'}
+                  </DialogDescription>
+                </DialogHeader>
               </div>
-              <DialogFooter>
-                <Button type="submit" disabled={loading}>
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {editingUser ? 'Update User' : 'Create User'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+
+              <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser}>
+                <div className="p-5 space-y-4 bg-card">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                      className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
+                    />
+                  </div>
+
+                  {!editingUser && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          required
+                          className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="password">Password</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          value={formData.password}
+                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                          required
+                          className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Role</Label>
+                    <Select
+                      value={formData.role}
+                      onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}
+                    >
+                      <SelectTrigger className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary">
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="cashier">Cashier</SelectItem>
+                        <SelectItem value="inventory">Inventory Manager</SelectItem>
+                        <SelectItem value="accountant">Accountant</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <DialogFooter className="p-4 bg-muted/60">
+                  <Button type="submit" disabled={loading} className="bg-gradient-to-r from-royal-blue-600 to-primary text-white hover:opacity-95">
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {editingUser ? 'Update User' : 'Create User'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
+      {/* Tabs rail */}
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="activities">Activity Logs</TabsTrigger>
+        <TabsList className="rounded-xl bg-muted/60 p-1 grid grid-cols-2 w-full">
+          <TabsTrigger
+            value="users"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:font-semibold"
+          >
+            Users
+          </TabsTrigger>
+          <TabsTrigger
+            value="activities"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:font-semibold"
+          >
+            Activity Logs
+          </TabsTrigger>
         </TabsList>
 
+        {/* Users table surface */}
         <TabsContent value="users">
-          <div className="rounded-md border">
+          <div className="page-surface rounded-xl border border-blue-100 shadow-elegant overflow-hidden">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted/40">
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
@@ -368,31 +355,19 @@ const UserManagementPage: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {users.map((user) => (
-                  <TableRow key={user.id}>
+                  <TableRow key={user.id} className="hover:bg-muted/40 transition-colors">
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell className="capitalize">{user.role}</TableCell>
+                    <TableCell>{format(new Date(user.created_at), 'MMM d, yyyy HH:mm')}</TableCell>
                     <TableCell>
-                      {format(new Date(user.created_at), 'MMM d, yyyy HH:mm')}
-                    </TableCell>
-                    <TableCell>
-                      {user.last_sign_in_at
-                        ? format(new Date(user.last_sign_in_at), 'MMM d, yyyy HH:mm')
-                        : 'Never'}
+                      {user.last_sign_in_at ? format(new Date(user.last_sign_in_at), 'MMM d, yyyy HH:mm') : 'Never'}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(user)}
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(user)}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
                       {user.id !== profile?.id && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteUser(user.id)}
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(user.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
@@ -404,10 +379,11 @@ const UserManagementPage: React.FC = () => {
           </div>
         </TabsContent>
 
+        {/* Activities table surface */}
         <TabsContent value="activities">
-          <div className="rounded-md border">
+          <div className="page-surface rounded-xl border border-blue-100 shadow-elegant overflow-hidden">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted/40">
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>User</TableHead>
@@ -417,10 +393,8 @@ const UserManagementPage: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {activities.map((activity) => (
-                  <TableRow key={activity.id}>
-                    <TableCell>
-                      {format(new Date(activity.date), 'MMM d, yyyy HH:mm')}
-                    </TableCell>
+                  <TableRow key={activity.id} className="hover:bg-muted/40 transition-colors">
+                    <TableCell>{format(new Date(activity.date), 'MMM d, yyyy HH:mm')}</TableCell>
                     <TableCell>{activity.performed_by_name}</TableCell>
                     <TableCell>{activity.description}</TableCell>
                     <TableCell className="capitalize">{activity.type}</TableCell>

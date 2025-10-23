@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -64,25 +63,25 @@ const AddProductPage: React.FC = () => {
   });
   
   const onSubmit = (data: FormValues) => {
-    // In a real app, this would call an API to save the product
     console.log('Product data to save:', {...data, expiryDate, imageUrl});
-    
     toast.success('Product added successfully!');
     navigate('/inventory');
   };
   
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Add New Product</h1>
-        <p className="text-muted-foreground">
-          Enter details for the new product
-        </p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Branded header band */}
+      <div className="rounded-xl overflow-hidden shadow border border-blue-100">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-6">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Add New Product</h1>
+          <p className="opacity-90">Enter details for the new product</p>
+        </div>
       </div>
-      
-      <Card>
+
+      {/* Form Card */}
+      <Card className="border-blue-100 shadow">
         <CardHeader>
-          <CardTitle>Product Information</CardTitle>
+          <CardTitle className="text-xl">Product Information</CardTitle>
           <CardDescription>
             Fill in all required fields to add a new product to inventory
           </CardDescription>
@@ -106,7 +105,11 @@ const AddProductPage: React.FC = () => {
                         <span className="mr-1">🏷</span> Product Name*
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Geisha Soap 125g" {...field} />
+                        <Input
+                          placeholder="e.g., Geisha Soap 125g"
+                          {...field}
+                          className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -120,7 +123,11 @@ const AddProductPage: React.FC = () => {
                     <FormItem>
                       <FormLabel>Brand*</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Unilever" {...field} />
+                        <Input
+                          placeholder="e.g., Unilever"
+                          {...field}
+                          className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -140,7 +147,7 @@ const AddProductPage: React.FC = () => {
                         defaultValue={field.value}
                       >
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary">
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                         </FormControl>
@@ -170,7 +177,7 @@ const AddProductPage: React.FC = () => {
                         defaultValue={field.value}
                       >
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary">
                             <SelectValue placeholder="Select unit" />
                           </SelectTrigger>
                         </FormControl>
@@ -196,7 +203,13 @@ const AddProductPage: React.FC = () => {
                         <span className="mr-1">🧮</span> Buying Price (KES)*
                       </FormLabel>
                       <FormControl>
-                        <Input type="number" min="0" step="0.01" {...field} />
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          {...field}
+                          className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -212,7 +225,13 @@ const AddProductPage: React.FC = () => {
                         <span className="mr-1">💸</span> Selling Price (KES)*
                       </FormLabel>
                       <FormControl>
-                        <Input type="number" min="0" step="0.01" {...field} />
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          {...field}
+                          className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -228,7 +247,12 @@ const AddProductPage: React.FC = () => {
                         <span className="mr-1">🔢</span> Opening Quantity*
                       </FormLabel>
                       <FormControl>
-                        <Input type="number" min="0" {...field} />
+                        <Input
+                          type="number"
+                          min="0"
+                          {...field}
+                          className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -248,7 +272,8 @@ const AddProductPage: React.FC = () => {
                           type="number" 
                           min="0" 
                           placeholder="Min quantity before alert"
-                          {...field} 
+                          {...field}
+                          className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
                         />
                       </FormControl>
                       <FormMessage />
@@ -264,9 +289,9 @@ const AddProductPage: React.FC = () => {
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
-                          variant={"outline"}
+                          variant="outline"
                           className={cn(
-                            "w-full pl-3 text-left font-normal",
+                            "w-full pl-3 text-left font-normal focus-visible:ring-4 focus-visible:ring-primary/20",
                             !expiryDate && "text-muted-foreground"
                           )}
                         >
@@ -284,9 +309,7 @@ const AddProductPage: React.FC = () => {
                         mode="single"
                         selected={expiryDate}
                         onSelect={setExpiryDate}
-                        disabled={(date) =>
-                          date < new Date()
-                        }
+                        disabled={(date) => date < new Date()}
                         initialFocus
                       />
                     </PopoverContent>
@@ -299,14 +322,14 @@ const AddProductPage: React.FC = () => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        <span className="mr-1">🧾</span> VAT Rate (%)*
+                        <span className="mr-1">🧾</span> VAT Rate (% )*
                       </FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
                       >
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary">
                             <SelectValue placeholder="Select VAT rate" />
                           </SelectTrigger>
                         </FormControl>
@@ -334,7 +357,7 @@ const AddProductPage: React.FC = () => {
                         defaultValue={field.value}
                       >
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary">
                             <SelectValue placeholder="Select supplier" />
                           </SelectTrigger>
                         </FormControl>
@@ -361,7 +384,11 @@ const AddProductPage: React.FC = () => {
                         <span className="mr-1">📎</span> Barcode (Optional)
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter barcode number" {...field} />
+                        <Input
+                          placeholder="Enter barcode number"
+                          {...field}
+                          className="focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -369,7 +396,11 @@ const AddProductPage: React.FC = () => {
                 />
               </div>
               
-              <Button type="submit" className="w-full md:w-auto">
+              {/* Gradient Save button (no custom variant needed) */}
+              <Button
+                type="submit"
+                className="w-full md:w-auto bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:opacity-95 transition-transform duration-200 active:scale-[0.98]"
+              >
                 <Save className="mr-2 h-4 w-4" />
                 Save Product
               </Button>
@@ -377,6 +408,18 @@ const AddProductPage: React.FC = () => {
           </Form>
         </CardContent>
       </Card>
+
+      {/* Soft page background tint (optional): wrap outer container if you want a stronger tint on this page only */}
+      <style>{`
+        /* Optional: page-level soft gradient—kept here so it only affects this page */
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out both;
+        }
+        @keyframes fade-in {
+          0% { opacity: 0; transform: translateY(10px) }
+          100% { opacity: 1; transform: translateY(0) }
+        }
+      `}</style>
     </div>
   );
 };

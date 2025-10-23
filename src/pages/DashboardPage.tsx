@@ -7,10 +7,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CalendarIcon, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
-import { 
-  getSalesAnalytics, 
-  getInventoryValue, 
-  getSales, 
+import {
+  getSalesAnalytics,
+  getInventoryValue,
+  getSales,
   getLowStockProducts,
   formatCurrency,
   getExpiringProducts
@@ -30,10 +30,7 @@ const DashboardPage = () => {
   const [lowStockItems, setLowStockItems] = useState<Product[]>([]);
   const [expiringItems, setExpiringItems] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<{
-    from: Date;
-    to: Date;
-  }>({
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date; }>({
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
     to: new Date()
   });
@@ -41,24 +38,16 @@ const DashboardPage = () => {
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetch all data in parallel
-      const [
-        analytics,
-        inventory,
-        sales,
-        lowStock,
-        expiring
-      ] = await Promise.all([
+      const [analytics, inventory, sales, lowStock, expiring] = await Promise.all([
         getSalesAnalytics(dateRange.from, dateRange.to),
         getInventoryValue(),
         getSales(dateRange.from, dateRange.to),
         getLowStockProducts(),
         getExpiringProducts(30)
       ]);
-
       setSalesData(analytics);
       setInventoryValue(inventory);
-      setRecentSales(sales.slice(0, 5)); // Get only 5 most recent sales
+      setRecentSales(sales.slice(0, 5));
       setLowStockItems(lowStock);
       setExpiringItems(expiring);
     } catch (error) {
@@ -68,123 +57,142 @@ const DashboardPage = () => {
     }
   }, [dateRange]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+  useEffect(() => { fetchDashboardData(); }, [fetchDashboardData]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">
-          Welcome, {profile?.name || 'Admin'}
-        </h1>
-        <div className="flex items-center gap-4">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <CalendarIcon className="h-4 w-4" />
-                {format(dateRange.from, 'MMM d, yyyy')} - {format(dateRange.to, 'MMM d, yyyy')}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={dateRange.from}
-                selected={dateRange}
-                onSelect={(range) => {
-                  if (range?.from && range?.to) {
-                    setDateRange({ from: range.from, to: range.to });
-                  }
-                }}
-                numberOfMonths={2}
-              />
-            </PopoverContent>
-          </Popover>
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={fetchDashboardData}
-            disabled={loading}
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button variant="outline">Settings</Button>
+    <div className="space-y-6 animate-slide-up">
+      {/* Page header + actions */}
+      <div className="page-surface p-4 md:p-6 hover-lift">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">Welcome, {profile?.name || 'Admin'}</h1>
+            <p className="text-sm text-muted-foreground">Overview of sales and inventory performance</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="gradient" className="gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  {format(dateRange.from, 'MMM d, yyyy')} – {format(dateRange.to, 'MMM d, yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange.from}
+                  selected={dateRange}
+                  onSelect={(range) => {
+                    if (range?.from && range?.to) setDateRange({ from: range.from, to: range.to });
+                  }}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Button
+              variant="gradient"
+              size="icon"
+              onClick={fetchDashboardData}
+              disabled={loading}
+              aria-label="Refresh"
+              className="hover-scale"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+
+            <Button variant="gradient-accent" className="hover-scale">
+              Settings
+            </Button>
+          </div>
         </div>
       </div>
 
+      {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="orders">Order Management</TabsTrigger>
+        <TabsList className="rounded-xl bg-muted/60 p-1">
+          <TabsTrigger
+            value="overview"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:font-semibold"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="orders"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:font-semibold"
+          >
+            Order Management
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
+          {/* Stat cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
+            <Card variant="elevated" className="hover-lift">
               <CardHeader>
                 <CardTitle>Total Sales</CardTitle>
                 <CardDescription>
-                  {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d, yyyy')}
+                  {format(dateRange.from, 'MMM d')} – {format(dateRange.to, 'MMM d, yyyy')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">
-                  {loading ? 'Loading...' : formatCurrency(salesData.totalSales)}
+                <p className="text-3xl font-bold text-royal-blue-600">
+                  {loading ? 'Loading…' : formatCurrency(salesData.totalSales)}
                 </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card variant="elevated" className="hover-lift">
               <CardHeader>
                 <CardTitle>Transactions</CardTitle>
                 <CardDescription>
-                  {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d, yyyy')}
+                  {format(dateRange.from, 'MMM d')} – {format(dateRange.to, 'MMM d, yyyy')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">
-                  {loading ? 'Loading...' : salesData.transactionCount}
+                <p className="text-3xl font-bold text-royal-blue-600">
+                  {loading ? 'Loading…' : salesData.transactionCount}
                 </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card variant="elevated" className="hover-lift">
               <CardHeader>
                 <CardTitle>Average Sale</CardTitle>
                 <CardDescription>
-                  {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d, yyyy')}
+                  {format(dateRange.from, 'MMM d')} – {format(dateRange.to, 'MMM d, yyyy')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">
-                  {loading ? 'Loading...' : formatCurrency(Number(salesData.averageSale))}
+                <p className="text-3xl font-bold text-royal-blue-600">
+                  {loading ? 'Loading…' : formatCurrency(Number(salesData.averageSale))}
                 </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card variant="elevated" className="hover-lift">
               <CardHeader>
                 <CardTitle>Inventory Value</CardTitle>
                 <CardDescription>Total cost value</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">
-                  {loading ? 'Loading...' : formatCurrency(Number(inventoryValue.totalCostValue))}
+                <p className="text-3xl font-bold text-royal-blue-600">
+                  {loading ? 'Loading…' : formatCurrency(Number(inventoryValue.totalCostValue))}
                 </p>
               </CardContent>
             </Card>
           </div>
 
+          {/* Lists */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="col-span-1">
+            <Card variant="interactive" className="col-span-1 animate-slide-up">
               <CardHeader>
                 <CardTitle>Recent Sales</CardTitle>
                 <CardDescription>Latest transactions</CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <p className="text-muted-foreground">Loading...</p>
+                  <p className="text-muted-foreground">Loading…</p>
                 ) : recentSales.length > 0 ? (
                   <div className="space-y-4">
                     {recentSales.map((sale) => (
@@ -199,7 +207,9 @@ const DashboardPage = () => {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold">{formatCurrency(Number(sale.total_amount))}</p>
+                          <p className="font-bold text-royal-blue-600">
+                            {formatCurrency(Number(sale.total_amount))}
+                          </p>
                           <p className="text-sm text-muted-foreground">
                             {sale.sale_items?.length || 0} items
                           </p>
@@ -213,14 +223,17 @@ const DashboardPage = () => {
               </CardContent>
             </Card>
 
-            <Card className="col-span-1">
+            <Card
+              variant="interactive"
+              className="col-span-1 animate-slide-up border border-vibrant-red-50 hover:shadow-glow-secondary"
+            >
               <CardHeader>
                 <CardTitle>Low Stock Items</CardTitle>
                 <CardDescription>Items below reorder level</CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <p className="text-muted-foreground">Loading...</p>
+                  <p className="text-muted-foreground">Loading…</p>
                 ) : lowStockItems.length > 0 ? (
                   <div className="space-y-4">
                     {lowStockItems.map((item) => (
@@ -230,12 +243,10 @@ const DashboardPage = () => {
                           <p className="text-sm text-muted-foreground">
                             Current stock: {item.stock_quantity}
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            SKU: {item.sku}
-                          </p>
+                          <p className="text-sm text-muted-foreground">SKU: {item.sku}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm text-red-500">
+                          <p className="text-sm text-vibrant-red-600">
                             Reorder level: {item.reorder_level}
                           </p>
                           <p className="text-sm text-muted-foreground">
@@ -251,14 +262,17 @@ const DashboardPage = () => {
               </CardContent>
             </Card>
 
-            <Card className="col-span-1">
+            <Card
+              variant="interactive"
+              className="col-span-1 animate-slide-up border border-vibrant-red-50 hover:shadow-glow-secondary"
+            >
               <CardHeader>
                 <CardTitle>Expiring Soon</CardTitle>
                 <CardDescription>Items expiring in 30 days</CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <p className="text-muted-foreground">Loading...</p>
+                  <p className="text-muted-foreground">Loading…</p>
                 ) : expiringItems.length > 0 ? (
                   <div className="space-y-4">
                     {expiringItems.map((item) => (
@@ -268,13 +282,14 @@ const DashboardPage = () => {
                           <p className="text-sm text-muted-foreground">
                             Expires: {new Date(item.expiry_date!).toLocaleDateString()}
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            Stock: {item.stock_quantity}
-                          </p>
+                          <p className="text-sm text-muted-foreground">Stock: {item.stock_quantity}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm text-red-500">
-                            {Math.ceil((new Date(item.expiry_date!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
+                          <p className="text-sm text-vibrant-red-600">
+                            {Math.ceil(
+                              (new Date(item.expiry_date!).getTime() - new Date().getTime()) /
+                              (1000 * 60 * 60 * 24)
+                            )} days left
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {formatCurrency(Number(item.cost))} per unit
