@@ -1,262 +1,269 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserRole } from '@/contexts/AuthContext';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
-import { toast } from 'sonner';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import logo from '@/assets/logo.png';
+import React, { useState } from "react";
+import { useAuth, UserRole } from "@/contexts/AuthContext";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
+import { toast } from "sonner";
+import logo from "@/assets/logo.png"; // ✅ use your provided logo
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState<UserRole>('cashier');
-  const [activeTab, setActiveTab] = useState('login');
-  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   const { login, signup, loading } = useAuth();
+  const [tab, setTab] = useState<"login" | "signup">("login");
+
+  // login state
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [remember, setRemember] = useState(false);
+
+  // signup state
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<UserRole>("cashier");
+  const [sEmail, setSEmail] = useState("");
+  const [sPassword, setSPassword] = useState("");
+  const [showSPass, setShowSPass] = useState(false);
+  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error('Please fill in all fields');
-      return;
-    }
+    if (!email || !password) return toast.error("Please fill in all fields");
     try {
       await login(email, password);
-    } catch (error) {
-      console.error('Login error:', error);
-      toast.error('Login failed. Please try again.');
+    } catch {
+      toast.error("Login failed. Please try again.");
     }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || !name) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-    if (password.length < 6) {
-      toast.error('Password must be at least 6 characters long');
-      return;
-    }
+    if (!name || !sEmail || !sPassword) return toast.error("Please fill in all fields");
+    if (sPassword.length < 6) return toast.error("Password must be at least 6 characters long");
     try {
-      await signup(email, password, name, role);
+      await signup(sEmail, sPassword, name, role);
       setShowEmailConfirmation(true);
-      setActiveTab('login');
-    } catch (error) {
-      console.error('Signup error:', error);
-      toast.error('Signup failed. Please try again.');
+      setTab("login");
+    } catch {
+      toast.error("Signup failed. Please try again.");
     }
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-6">
-      <div className="flex flex-col items-center gap-6 animate-slide-up">
-        {/* Logo */}
-        <div className="relative">
-          <div className="absolute inset-0 rounded-full blur-2xl opacity-30 gradient-accent animate-gradient-shift bg-[length:200%_200%]" />
-          <img
-            src={logo}
-            alt="SOTE MINIMART"
-            className="relative h-16 w-auto animate-float drop-shadow"
-          />
+    <div className="min-h-screen w-full bg-gradient-to-b from-primary/10 via-background to-secondary/5 flex items-start md:items-center justify-center p-6">
+      <Card className="w-full max-w-lg overflow-hidden shadow-xl border-blue-100">
+        {/* ✅ Blue Header with Logo Inside */}
+        <div className="bg-gradient-to-b from-blue-700 to-blue-600 text-white px-6 pb-10 pt-8 text-center relative rounded-b-none">
+          <div className="flex justify-center mb-4">
+            <img
+              src={logo}
+              alt="SOTE MINIMART"
+              className="h-20 w-auto bg-white rounded-xl p-2 drop-shadow-md"
+            />
+          </div>
+          <h1 className="text-2xl md:text-3xl font-extrabold mt-1">Welcome Back!</h1>
+          <p className="opacity-90 text-sm">Sign in to access your POS system</p>
         </div>
 
-        {/* Auth Card */}
-        <Card className="w-full max-w-md rounded-xl border-2 border-primary/10 shadow-elegant bg-white/90 backdrop-blur">
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">Welcome to SOTE Minimart</CardTitle>
-            <CardDescription className="text-center">
-              Sign in or create an account to access the POS system.
-            </CardDescription>
-          </CardHeader>
-
-          {showEmailConfirmation && (
-            <div className="px-6 pb-0">
-              <Alert>
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Account created! Please check your email for a confirmation link before logging in.
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
-
-          <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="px-6">
-            <TabsList className="grid grid-cols-2 w-full rounded-xl bg-muted/60">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+        <CardContent className="p-6">
+          {/* Tabs (Login / Signup) */}
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "login" | "signup")} className="w-full">
+            <TabsList className="grid grid-cols-2 w-full mb-6 bg-muted/60 p-1 rounded-xl">
+              <TabsTrigger
+                value="login"
+                className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:font-semibold"
+              >
+                Login
+              </TabsTrigger>
+              <TabsTrigger
+                value="signup"
+                className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:font-semibold"
+              >
+                Sign Up
+              </TabsTrigger>
             </TabsList>
 
             {/* LOGIN */}
             <TabsContent value="login">
-              <form onSubmit={handleLogin}>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="login-email"
                       type="email"
                       placeholder="email@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      required
+                      className="pl-9 h-12 focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
                       disabled={loading}
-                      className="input-strong"
+                      required
                     />
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
+                <div className="space-y-2">
+                  <Label>Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="login-password"
-                      type="password"
+                      type={showPass ? "text" : "password"}
+                      placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      required
+                      className="pl-9 pr-10 h-12 focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
                       disabled={loading}
-                      className="input-strong"
+                      required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((s) => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    >
+                      {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
+                </div>
 
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      If you just created an account, please confirm your email before logging in.
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
+                <Alert className="border border-blue-200 bg-blue-50 text-blue-900">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    If you just created an account, please confirm your email before logging in.
+                  </AlertDescription>
+                </Alert>
 
-                <CardFooter>
-                  <Button
-                    className="w-full hover-scale gradient-primary text-white shadow-glow-primary"
-                    type="submit"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Logging in...
-                      </>
-                    ) : (
-                      'Login'
-                    )}
-                  </Button>
-                </CardFooter>
+                <div className="flex items-center justify-between text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={remember}
+                      onChange={(e) => setRemember(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    Remember me
+                  </label>
+                  <a className="text-primary hover:underline" href="#">
+                    Forgot Password?
+                  </a>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-base bg-gradient-to-r from-blue-700 to-blue-500 hover:opacity-95"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Logging in...
+                    </>
+                  ) : (
+                    "Login to Dashboard"
+                  )}
+                </Button>
               </form>
             </TabsContent>
 
-            {/* SIGN UP */}
+            {/* SIGNUP */}
             <TabsContent value="signup">
-              <form onSubmit={handleSignup}>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Name</Label>
-                    <Input
-                      id="signup-name"
-                      placeholder="Enter your name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                      disabled={loading}
-                      className="input-strong"
-                    />
-                  </div>
+              {showEmailConfirmation && (
+                <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Account created! Please check your email for a confirmation link before logging in.
+                  </AlertDescription>
+                </Alert>
+              )}
+              <form onSubmit={handleSignup} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="h-12 focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
+                    disabled={loading}
+                    required
+                  />
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
+                <div className="space-y-2">
+                  <Label>Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="signup-email"
                       type="email"
                       placeholder="email@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
+                      value={sEmail}
+                      onChange={(e) => setSEmail(e.target.value)}
+                      className="pl-9 h-12 focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
                       disabled={loading}
-                      className="input-strong"
+                      required
                     />
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
+                <div className="space-y-2">
+                  <Label>Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="signup-password"
-                      type="password"
+                      type={showSPass ? "text" : "password"}
                       placeholder="Create a password (min 6 characters)"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
+                      value={sPassword}
+                      onChange={(e) => setSPassword(e.target.value)}
+                      className="pl-9 pr-10 h-12 focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary"
                       disabled={loading}
                       minLength={6}
-                      className="input-strong"
+                      required
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-role">Role</Label>
-                    <Select
-                      value={role}
-                      onValueChange={(value) => setRole(value as UserRole)}
-                      disabled={loading}
+                    <button
+                      type="button"
+                      onClick={() => setShowSPass((s) => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                     >
-                      <SelectTrigger className="input-strong">
-                        <SelectValue placeholder="Select a role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="cashier">Cashier</SelectItem>
-                        <SelectItem value="inventory">Inventory</SelectItem>
-                        <SelectItem value="accountant">Accountant</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      {showSPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
-                </CardContent>
+                </div>
 
-                <CardFooter>
-                  <Button
-                    className="w-full hover-scale gradient-secondary text-white shadow-glow-secondary"
-                    type="submit"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating Account...
-                      </>
-                    ) : (
-                      'Create Account'
-                    )}
-                  </Button>
-                </CardFooter>
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
+                    <SelectTrigger className="h-12 focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary">
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="cashier">Cashier</SelectItem>
+                      <SelectItem value="inventory">Inventory</SelectItem>
+                      <SelectItem value="accountant">Accountant</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-base bg-gradient-to-r from-blue-700 to-blue-500 hover:opacity-95"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    "Create Account"
+                  )}
+                </Button>
               </form>
             </TabsContent>
           </Tabs>
-        </Card>
-
-        {/* Footer note */}
-        <p className="text-xs text-muted-foreground text-center">
-          By continuing, you agree to the Terms & Privacy Policy.
-        </p>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
