@@ -18,9 +18,6 @@ interface LineItem {
   description: string;
   quantity: number;
   unit_cost: number;
-  tax_rate: number;
-  tax_amount: number;
-  subtotal: number;
   total: number;
 }
 
@@ -65,13 +62,11 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
       description: '',
       quantity: 1,
       unit_cost: 0,
-      tax_rate: 16,
-      tax_amount: 0,
-      subtotal: 0,
       total: 0,
     }
   ]);
   
+  const [manualTax, setManualTax] = useState<number>(0);
   const [products, setProducts] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,7 +87,7 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
           payment_terms: invoice.payment_terms || 'Net 30',
           status: invoice.status,
         });
-        fetchLineItems(invoice.id);
+        fetchInvoiceDetails(invoice.id);
       }
     }
   }, [open, invoice]);
@@ -125,32 +120,42 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
     }
   };
 
-  const fetchLineItems = async (invoiceId: string) => {
+  const fetchInvoiceDetails = async (invoiceId: string) => {
     try {
-      const { data, error } = await supabase
+      // Fetch invoice details to get tax amount
+      const { data: invoiceData, error: invoiceError } = await supabase
+        .from('invoices')
+        .select('tax_amount')
+        .eq('id', invoiceId)
+        .single();
+      
+      if (invoiceError) throw invoiceError;
+      
+      if (invoiceData?.tax_amount) {
+        setManualTax(invoiceData.tax_amount);
+      }
+
+      // Fetch line items
+      const { data: lineItemsData, error: lineItemsError } = await supabase
         .from('invoice_line_items')
         .select('*')
         .eq('invoice_id', invoiceId);
       
-      if (error) throw error;
+      if (lineItemsError) throw lineItemsError;
       
-      if (data && data.length > 0) {
-        setLineItems(data);
+      if (lineItemsData && lineItemsData.length > 0) {
+        setLineItems(lineItemsData);
       }
     } catch (error) {
-      console.error('Error fetching line items:', error);
+      console.error('Error fetching invoice details:', error);
     }
   };
 
   const calculateLineItem = (item: LineItem): LineItem => {
-    const subtotal = item.quantity * item.unit_cost;
-    const tax_amount = subtotal * (item.tax_rate / 100);
-    const total = subtotal + tax_amount;
+    const total = item.quantity * item.unit_cost;
     
     return {
       ...item,
-      subtotal,
-      tax_amount,
       total,
     };
   };
@@ -180,9 +185,6 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
       description: '',
       quantity: 1,
       unit_cost: 0,
-      tax_rate: 16,
-      tax_amount: 0,
-      subtotal: 0,
       total: 0,
     }]);
   };
@@ -194,11 +196,14 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
   };
 
   const calculateTotals = () => {
-    return lineItems.reduce((acc, item) => ({
-      subtotal: acc.subtotal + item.subtotal,
-      tax: acc.tax + item.tax_amount,
-      total: acc.total + item.total,
-    }), { subtotal: 0, tax: 0, total: 0 });
+    const netAmount = lineItems.reduce((acc, item) => acc + item.total, 0);
+    const finalTotal = netAmount + manualTax;
+    
+    return {
+      netAmount,
+      tax: manualTax,
+      total: finalTotal,
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -219,7 +224,7 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
         issue_date: formData.issue_date,
         payment_terms: formData.payment_terms,
         status: formData.status,
-        subtotal: totals.subtotal,
+        subtotal: totals.netAmount,
         tax_amount: totals.tax,
         total_amount: totals.total,
         amount: totals.total,
@@ -246,9 +251,9 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
         description: item.description,
         quantity: item.quantity,
         unit_cost: item.unit_cost,
-        tax_rate: item.tax_rate,
-        tax_amount: item.tax_amount,
-        subtotal: item.subtotal,
+        tax_rate: 0,
+        tax_amount: 0,
+        subtotal: item.total,
         total: item.total,
       }));
 
@@ -293,11 +298,9 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
       description: '',
       quantity: 1,
       unit_cost: 0,
-      tax_rate: 16,
-      tax_amount: 0,
-      subtotal: 0,
       total: 0,
     }]);
+    setManualTax(0);
   };
 
   const totals = calculateTotals();
@@ -432,9 +435,6 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
                     <TableHead>Description</TableHead>
                     <TableHead className="w-24">Qty</TableHead>
                     <TableHead className="w-32">Unit Cost</TableHead>
-                    <TableHead className="w-24">Tax %</TableHead>
-                    <TableHead className="w-32">Subtotal</TableHead>
-                    <TableHead className="w-32">Tax</TableHead>
                     <TableHead className="w-32">Total</TableHead>
                     <TableHead className="w-16"></TableHead>
                   </TableRow>
@@ -486,17 +486,6 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
                           onChange={(e) => updateLineItem(index, 'unit_cost', parseFloat(e.target.value) || 0)}
                         />
                       </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={item.tax_rate}
-                          onChange={(e) => updateLineItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
-                        />
-                      </TableCell>
-                      <TableCell>KES {item.subtotal.toFixed(2)}</TableCell>
-                      <TableCell>KES {item.tax_amount.toFixed(2)}</TableCell>
                       <TableCell>KES {item.total.toFixed(2)}</TableCell>
                       <TableCell>
                         {lineItems.length > 1 && (
@@ -517,17 +506,26 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
               
               {/* Totals */}
               <div className="mt-4 flex justify-end">
-                <div className="w-80 space-y-2">
+                <div className="w-80 space-y-3">
                   <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>KES {totals.subtotal.toFixed(2)}</span>
+                    <span>Net Amount:</span>
+                    <span>KES {totals.netAmount.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Tax:</span>
-                    <span>KES {totals.tax.toFixed(2)}</span>
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="manual_tax">Tax (Manual Entry):</Label>
+                    <Input
+                      id="manual_tax"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={manualTax}
+                      onChange={(e) => setManualTax(parseFloat(e.target.value) || 0)}
+                      className="w-40 text-right"
+                      placeholder="0.00"
+                    />
                   </div>
                   <div className="flex justify-between font-bold text-lg border-t pt-2">
-                    <span>Total:</span>
+                    <span>Final Total:</span>
                     <span>KES {totals.total.toFixed(2)}</span>
                   </div>
                 </div>
