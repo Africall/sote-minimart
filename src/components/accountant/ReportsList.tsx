@@ -11,6 +11,7 @@ export const ReportsList: React.FC = () => {
     loading,
     reportData,
     totalItems,
+    reportTotals,
     dateRange,
     setDateRange,
     customDateRange,
@@ -42,7 +43,7 @@ export const ReportsList: React.FC = () => {
             selectedReport={selectedReport}
             onReportChange={setSelectedReport}
             dateRange={dateRange}
-            onDateRangeChange={setDateRange}
+            onDateRangeChange={(value) => setDateRange(value as 'today' | 'week' | 'month' | 'custom')}
             customDateRange={customDateRange}
             onCustomDateRangeChange={setCustomDateRange}
             selectedCashier={selectedCashier}
@@ -61,6 +62,7 @@ export const ReportsList: React.FC = () => {
             totalItems={totalItems}
             reportType={selectedReport}
             pagination={pagination}
+            reportTotals={reportTotals}
           />
         </div>
       </div>

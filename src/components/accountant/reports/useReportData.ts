@@ -22,6 +22,7 @@ export const useReportData = () => {
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<any[]>([]);
   const [totalItems, setTotalItems] = useState(0);
+  const [reportTotals, setReportTotals] = useState<{ totalAmount: number; totalTransactions: number } | undefined>(undefined);
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'custom'>('today');
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedCashier, setSelectedCashier] = useState('all');
@@ -109,6 +110,12 @@ export const useReportData = () => {
           );
           setReportData(salesResponse.data || []);
           setTotalItems(salesResponse.count || 0);
+          
+          // Calculate totals for all sales (not just current page)
+          const allSalesForTotals = await fetchAllSales(dateParams);
+          const totalAmount = allSalesForTotals.reduce((sum, sale) => sum + (Number(sale.total_amount) || 0), 0);
+          const totalTransactions = allSalesForTotals.length;
+          setReportTotals({ totalAmount, totalTransactions });
           break;
         }
         case 'expenses': {
@@ -118,18 +125,21 @@ export const useReportData = () => {
           );
           setReportData(expensesResponse.data || []);
           setTotalItems(expensesResponse.count || 0);
+          setReportTotals(undefined);
           break;
         }
         case 'stock': {
           const inventoryData = await getLiveInventoryAnalytics();
           setReportData(inventoryData ? [inventoryData] : []);
           setTotalItems(inventoryData ? 1 : 0);
+          setReportTotals(undefined);
           break;
         }
         default: {
           console.warn('Unknown report type:', selectedReport);
           setReportData([]);
           setTotalItems(0);
+          setReportTotals(undefined);
         }
       }
     } catch (error: any) {
@@ -137,6 +147,7 @@ export const useReportData = () => {
       toast.error('Failed to load report data');
       setReportData([]);
       setTotalItems(0);
+      setReportTotals(undefined);
     } finally {
       setLoading(false);
     }
@@ -226,7 +237,7 @@ export const useReportData = () => {
     let exportData: any[] = [];
 
     switch (report) {
-      case 'sales':
+      case 'sales': {
         exportData = rows.map((sale) => ({
           'Product Name': sale.product_name ?? 'Multiple Items',
           'Cashier': sale.cashier_name ?? 'Unknown',
@@ -235,7 +246,21 @@ export const useReportData = () => {
           'Status': sale.payment_status ?? '',
           'Amount': sale.total_amount ?? 0
         }));
+        
+        // Add totals row
+        const totalAmount = rows.reduce((sum, sale) => sum + (Number(sale.total_amount) || 0), 0);
+        const totalTransactions = rows.length;
+        
+        exportData.push({
+          'Product Name': '',
+          'Cashier': '',
+          'Date': '',
+          'Payment Method': '',
+          'Status': `TOTAL (${totalTransactions} Sales)`,
+          'Amount': totalAmount
+        });
         break;
+      }
       case 'expenses':
         exportData = rows.map((expense) => ({
           'Title': expense.title ?? '',
@@ -352,6 +377,7 @@ export const useReportData = () => {
     loading,
     reportData,
     totalItems,
+    reportTotals,
     dateRange,
     setDateRange,
     customDateRange,

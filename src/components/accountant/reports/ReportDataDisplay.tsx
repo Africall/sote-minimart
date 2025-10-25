@@ -21,6 +21,10 @@ interface ReportDataDisplayProps {
     endIndex: number;
     goToPage: (page: number) => void;
   };
+  reportTotals?: {
+    totalAmount: number;
+    totalTransactions: number;
+  };
 }
 
 function safeFormatDate(input: string | Date | null | undefined, fmt = 'MMM dd, yyyy') {
@@ -35,7 +39,7 @@ function safeFormatDate(input: string | Date | null | undefined, fmt = 'MMM dd, 
   return d && isValid(d) ? format(d, fmt) : '—';
 }
 
-const renderSalesTable = (data: any[]) => (
+const renderSalesTable = (data: any[], totals?: { totalAmount: number; totalTransactions: number }) => (
   <div className="rounded-md border">
     <Table>
       <TableHeader>
@@ -76,6 +80,21 @@ const renderSalesTable = (data: any[]) => (
             </TableCell>
           </TableRow>
         ))}
+        {totals && (
+          <TableRow className="bg-muted/50 font-semibold border-t-2">
+            <TableCell colSpan={4} className="text-right font-bold">
+              TOTALS:
+            </TableCell>
+            <TableCell className="text-center">
+              <Badge variant="default" className="font-semibold">
+                {totals.totalTransactions} Sale{totals.totalTransactions !== 1 ? 's' : ''}
+              </Badge>
+            </TableCell>
+            <TableCell className="text-right font-bold text-lg text-green-600">
+              {formatCurrency(totals.totalAmount)}
+            </TableCell>
+          </TableRow>
+        )}
       </TableBody>
     </Table>
   </div>
@@ -168,7 +187,8 @@ export const ReportDataDisplay: React.FC<ReportDataDisplayProps> = ({
   reportData,
   totalItems,
   reportType,
-  pagination
+  pagination,
+  reportTotals
 }) => {
   const renderReportContent = () => {
     if (loading) {
@@ -194,13 +214,13 @@ export const ReportDataDisplay: React.FC<ReportDataDisplayProps> = ({
 
     switch (reportType) {
       case 'sales':
-        return renderSalesTable(reportData);
+        return renderSalesTable(reportData, reportTotals);
       case 'expenses':
         return renderExpensesTable(reportData);
       case 'stock':
         return renderInventoryStats(reportData);
       default:
-        return renderSalesTable(reportData);
+        return renderSalesTable(reportData, reportTotals);
     }
   };
   return (
