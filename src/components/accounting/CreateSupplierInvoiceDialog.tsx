@@ -263,10 +263,77 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
 
       if (lineItemsError) throw lineItemsError;
 
-      toast({
-        title: 'Success',
-        description: `Supplier invoice ${invoice?.id ? 'updated' : 'created'} successfully`,
-      });
+      // Update inventory stock for products when creating new invoice (not editing)
+      // Only update stock if status is not 'draft'
+      if (!invoice?.id && formData.status !== 'draft') {
+        console.log('=== STARTING INVENTORY UPDATE ===');
+        console.log('Line items to process:', lineItems);
+        
+        const stockUpdatePromises = lineItems
+          .filter(item => {
+            const hasProductId = !!item.product_id;
+            console.log(`Item "${item.product_name}": has product_id = ${hasProductId}, product_id = ${item.product_id}`);
+            return hasProductId;
+          })
+          .map(async (item) => {
+            try {
+              console.log(`Attempting to update stock for product ${item.product_id}, quantity: ${item.quantity}`);
+              
+              // Update stock using the RPC function (increases stock)
+              const { data: rpcData, error: stockError } = await supabase.rpc('update_product_stock', {
+                product_id_param: item.product_id!,
+                quantity_change: item.quantity
+              });
+
+              console.log(`RPC result for ${item.product_id}:`, { data: rpcData, error: stockError });
+
+              if (stockError) {
+                console.error(`Failed to update stock for product ${item.product_id}:`, stockError);
+                return { success: false, product: item.product_name, error: stockError.message };
+              }
+              
+              console.log(`Successfully updated stock for ${item.product_name}`);
+              return { success: true, product: item.product_name };
+            } catch (error) {
+              console.error(`Exception updating stock for product ${item.product_id}:`, error);
+              return { success: false, product: item.product_name, error: String(error) };
+            }
+          });
+
+        const stockUpdateResults = await Promise.all(stockUpdatePromises);
+        console.log('All stock update results:', stockUpdateResults);
+        
+        const failedUpdates = stockUpdateResults.filter(result => !result.success);
+
+        if (failedUpdates.length > 0) {
+          const failedProducts = failedUpdates.map(r => `${r.product} (${r.error || 'unknown error'})`).join(', ');
+          console.error('Failed updates:', failedProducts);
+          toast({
+            title: 'Partial Success',
+            description: `Invoice created but failed to update inventory for: ${failedProducts}`,
+            variant: 'destructive',
+          });
+        } else if (stockUpdateResults.length > 0) {
+          console.log('All stock updates successful!');
+          toast({
+            title: 'Success',
+            description: `Supplier invoice created and inventory updated for ${stockUpdateResults.length} product(s)`,
+          });
+        } else {
+          console.log('No products with product_id found to update');
+          toast({
+            title: 'Success',
+            description: `Supplier invoice created (no inventory items to update)`,
+          });
+        }
+      } else {
+        const reason = invoice?.id ? 'editing existing invoice' : 'draft status';
+        console.log(`Skipping inventory update - reason: ${reason}`);
+        toast({
+          title: 'Success',
+          description: `Supplier invoice ${invoice?.id ? 'updated' : 'created'} successfully${formData.status === 'draft' ? ' (draft - inventory not updated)' : ''}`,
+        });
+      }
 
       onInvoiceCreated();
       onOpenChange(false);
