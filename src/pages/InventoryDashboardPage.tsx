@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Product as FrontendProduct } from '@/types/product';
 import { useInventoryData } from '@/hooks/useInventoryData';
@@ -43,6 +42,7 @@ const InventoryDashboardPage = () => {
   const [selectedProduct, setSelectedProduct] = useState<FrontendProduct | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<FrontendProduct | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
     products,
@@ -70,43 +70,43 @@ const InventoryDashboardPage = () => {
     const searchLower = searchQuery.toLowerCase().trim();
     if (!searchLower) return true;
     
-    console.log('Searching for:', searchLower);
-    console.log('Checking product:', product.name);
-    
     const nameMatch = product.name.toLowerCase().includes(searchLower);
     const barcodeMatch = searchInBarcode(product.barcode, searchLower);
     const categoryMatch = product.category.toLowerCase().includes(searchLower);
     
-    const isMatch = nameMatch || barcodeMatch || categoryMatch;
-    
-    if (isMatch) {
-      console.log('Match found:', product.name, { nameMatch, barcodeMatch, categoryMatch });
-    }
-    
-    return isMatch;
+    return nameMatch || barcodeMatch || categoryMatch;
   });
-
-  console.log('Total products:', products.length);
-  console.log('Filtered products:', filteredProducts.length);
-  console.log('Search query:', searchQuery);
 
   // Convert expiring items to frontend products for consistent handling
   const convertedExpiringItems = expiringItems.map(convertToFrontendProduct);
 
-  // Handle delete product
+  // Handle delete product with improved error handling
   const handleDeleteProduct = async () => {
-    if (!productToDelete) return;
+    if (!productToDelete) {
+      toast.error('No product selected for deletion');
+      return;
+    }
+    
+    setIsDeleting(true);
     
     try {
+      console.log('Deleting product:', productToDelete.id, productToDelete.name);
+      
       await deleteProduct(productToDelete.id);
-      toast.success('Product deleted successfully');
+      
+      toast.success(`"${productToDelete.name}" has been deleted successfully`);
+      
+      // Refresh the inventory list
       await fetchInventoryData();
-    } catch (error: any) {
-      console.error('Error deleting product:', error);
-      toast.error('Failed to delete product: ' + error.message);
-    } finally {
+      
+      // Close dialog and clear state
       setDeleteDialogOpen(false);
       setProductToDelete(null);
+    } catch (error: any) {
+      console.error('Error deleting product:', error);
+      toast.error(error?.message || 'Failed to delete product. Please try again.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -133,6 +133,13 @@ const InventoryDashboardPage = () => {
       product.category.toLowerCase().includes(searchLower)
     );
   });
+
+  // Handle delete action from product card
+  const handleDeleteClick = (product: FrontendProduct) => {
+    console.log('Delete clicked for product:', product.id, product.name);
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
   
   return (
     <div className="space-y-6">
@@ -163,10 +170,7 @@ const InventoryDashboardPage = () => {
           setSelectedProduct(product);
           setEditOpen(true);
         }}
-        onDelete={(product) => {
-          setProductToDelete(product);
-          setDeleteDialogOpen(true);
-        }}
+        onDelete={handleDeleteClick}
         onMarkExpired={(productId) => handleMarkExpired(productId, products)}
       />
 
@@ -189,16 +193,22 @@ const InventoryDashboardPage = () => {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Product?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete "{productToDelete?.name}". This action cannot be undone.
+              Are you sure you want to delete <strong>"{productToDelete?.name}"</strong>?
+              <br /><br />
+              This action cannot be undone. The product will be permanently removed from your inventory.
               All sales history and related data will remain intact.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProduct} className="bg-destructive text-destructive-foreground">
-              Delete Product
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteProduct} 
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Product'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
