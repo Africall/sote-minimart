@@ -7,9 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Trash2 } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Plus, Trash2, Check, ChevronsUpDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface LineItem {
   id?: string;
@@ -70,6 +73,7 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
   const [products, setProducts] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [openProductCombobox, setOpenProductCombobox] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
     if (open) {
@@ -510,21 +514,53 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
                   {lineItems.map((item, index) => (
                     <TableRow key={index}>
                       <TableCell>
-                        <Select value={item.product_id || ''} onValueChange={(value) => updateLineItem(index, 'product_id', value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Popover 
+                          open={openProductCombobox[index]} 
+                          onOpenChange={(open) => setOpenProductCombobox({ ...openProductCombobox, [index]: open })}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={openProductCombobox[index]}
+                              className="w-full justify-between"
+                            >
+                              {item.product_name || "Select product..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0">
+                            <Command>
+                              <CommandInput placeholder="Search products..." />
+                              <CommandList>
+                                <CommandEmpty>No product found.</CommandEmpty>
+                                <CommandGroup>
+                                  {products.map((product) => (
+                                    <CommandItem
+                                      key={product.id}
+                                      value={product.name}
+                                      onSelect={() => {
+                                        updateLineItem(index, 'product_id', product.id);
+                                        setOpenProductCombobox({ ...openProductCombobox, [index]: false });
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          item.product_id === product.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {product.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                         <Input
                           className="mt-1"
-                          placeholder="Or enter product name"
+                          placeholder="Or enter product name manually"
                           value={item.product_name}
                           onChange={(e) => updateLineItem(index, 'product_name', e.target.value)}
                         />

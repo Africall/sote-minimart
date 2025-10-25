@@ -14,6 +14,7 @@ import {
   DollarSign,
   Calculator,
   LogOut,
+  FileBarChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,6 +31,7 @@ const getMenuItems = (role: string) => {
     { icon: ShoppingCart, label: "POS", path: "/cashier-pos", roles: ["admin", "cashier"] },
     { icon: AlertTriangle, label: "Reorder Alerts", path: "/reorder-alerts", roles: ["admin", "inventory"] },
     { icon: Calendar, label: "Expiry Tracker", path: "/expiry-tracker", roles: ["admin", "inventory"] },
+    { icon: FileBarChart, label: "Stock Movement Report", path: "/stock-movement-report", roles: ["admin", "inventory"] },
     { icon: Truck, label: "Suppliers", path: "/suppliers", roles: ["admin", "inventory"] },
     { icon: BarChart3, label: "Reports", path: "/reports", roles: ["admin", "accountant"] },
     { icon: Calculator, label: "Accounting", path: "/accounting", roles: ["admin", "accountant", "cashier"] },

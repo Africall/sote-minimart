@@ -30,6 +30,7 @@ import ImportExportPage from '@/pages/ImportExportPage';
 import NotFound from '@/pages/NotFound';
 import UnauthorizedPage from '@/pages/UnauthorizedPage';
 import { AccountingPage } from '@/pages/AccountingPage';
+import StockMovementReportPage from '@/pages/StockMovementReportPage';
 
 function App() {
   console.log('App component rendering');
@@ -64,6 +65,7 @@ function App() {
                       <Route path="settings" element={<SettingsPage />} />
                       <Route path="restock" element={<RestockPage />} />
                       <Route path="inventory-movement" element={<InventoryMovementPage />} />
+                      <Route path="stock-movement-report" element={<StockMovementReportPage />} />
                       <Route path="import-export" element={<ImportExportPage />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
