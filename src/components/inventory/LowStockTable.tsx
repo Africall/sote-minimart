@@ -54,13 +54,14 @@ export const LowStockTable: React.FC<LowStockTableProps> = ({
                       {formatCurrency(item.cost * item.stock_quantity)}
                     </td>
                     <td className="px-6 py-4">
-                      <Button 
+                      {/* RESTOCK BUTTON COMMENTED OUT FOR SAFETY */}
+                      {/* <Button 
                         variant="outline" 
                         size="sm"
                         onClick={() => onRestock?.(item)}
                       >
                         Restock
-                      </Button>
+                      </Button> */}
                     </td>
                   </tr>
                 ))
@@ -77,4 +78,4 @@ export const LowStockTable: React.FC<LowStockTableProps> = ({
       </CardContent>
     </Card>
   );
-}; 
+};

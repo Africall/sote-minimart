@@ -192,13 +192,14 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                             <Edit className="w-3 h-3 mr-1" />
                             Edit
                           </Button>
-                          <Button 
+                          {/* RESTOCK BUTTON COMMENTED OUT FOR SAFETY */}
+                          {/* <Button 
                             variant="outline" 
                             size="sm"
                             onClick={() => onRestock?.(product)}
                           >
                             Restock
-                          </Button>
+                          </Button> */}
                         </div>
                       </td>
                     </tr>
@@ -217,4 +218,4 @@ export const ProductTable: React.FC<ProductTableProps> = ({
       </CardContent>
     </Card>
   );
-}; 
+};

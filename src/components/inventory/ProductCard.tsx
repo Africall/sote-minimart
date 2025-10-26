@@ -112,14 +112,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 )}
               </>
             )}
-            <Button 
+            {/* RESTOCK BUTTON COMMENTED OUT FOR SAFETY */}
+            {/* <Button 
               variant="outline" 
               size="sm"
               className={`h-6 text-xs px-1 ${canEdit ? 'flex-1' : 'w-full'}`}
               onClick={() => onRestock?.(product)}
             >
               Restock
-            </Button>
+            </Button> */}
           </div>
         </div>
       </CardContent>

@@ -3,7 +3,8 @@ import { Product as FrontendProduct } from '@/types/product';
 import { Product } from '@/utils/supabaseUtils';
 import { AddProductDialog } from './AddProductDialog';
 import { EditProductDialog } from './EditProductDialog';
-import { RestockDialog } from './RestockDialog';
+// RESTOCK DIALOG IMPORT COMMENTED OUT FOR SAFETY
+// import { RestockDialog } from './RestockDialog';
 
 interface InventoryDialogsProps {
   addProductOpen: boolean;
@@ -74,7 +75,8 @@ export const InventoryDialogs = ({
         loading={actionLoading}
       />
 
-      <RestockDialog
+      {/* RESTOCK DIALOG COMMENTED OUT FOR SAFETY */}
+      {/* <RestockDialog
         open={restockOpen}
         onOpenChange={(open) => {
           onRestockOpenChange(open);
@@ -87,7 +89,7 @@ export const InventoryDialogs = ({
           await onRestock(productId, quantity);
         }}
         loading={actionLoading}
-      />
+      /> */}
     </>
   );
 };

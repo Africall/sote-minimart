@@ -5,8 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Filter, Eye, Edit, CreditCard, Paperclip, Download, Mail, MoreHorizontal, Loader2 } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Plus, Search, Filter, Eye, Edit, CreditCard, Paperclip, Download, Mail, MoreHorizontal, Loader2, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { CreateSupplierInvoiceDialog } from './CreateSupplierInvoiceDialog';
@@ -59,6 +60,9 @@ export const SupplierInvoicesModule: React.FC = () => {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<SupplierInvoice | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<SupplierInvoice | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchInvoices();
@@ -157,6 +161,53 @@ export const SupplierInvoicesModule: React.FC = () => {
       title: 'Send Email',
       description: `Sending invoice ${invoiceId} via email...`,
     });
+  };
+
+  const handleDeleteClick = (invoice: SupplierInvoice) => {
+    setInvoiceToDelete(invoice);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteInvoice = async () => {
+    if (!invoiceToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      // First delete line items
+      const { error: lineItemsError } = await supabase
+        .from('invoice_line_items')
+        .delete()
+        .eq('invoice_id', invoiceToDelete.id);
+
+      if (lineItemsError) throw lineItemsError;
+
+      // Then delete the invoice
+      const { error: invoiceError } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', invoiceToDelete.id);
+
+      if (invoiceError) throw invoiceError;
+
+      toast({
+        title: 'Success',
+        description: `Invoice ${invoiceToDelete.id} has been deleted successfully`,
+      });
+
+      // Refresh the invoice list
+      await fetchInvoices();
+      setShowDeleteDialog(false);
+      setInvoiceToDelete(null);
+    } catch (error: any) {
+      console.error('Error deleting invoice:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete invoice',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Calculate totals
@@ -362,6 +413,14 @@ export const SupplierInvoicesModule: React.FC = () => {
                                   <Paperclip className="h-4 w-4 mr-2" />
                                   Attach File
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteClick(invoice)}
+                                  className="text-red-600 focus:text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Invoice
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -442,6 +501,42 @@ export const SupplierInvoicesModule: React.FC = () => {
           <AccountsPayableTracker />
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Supplier Invoice?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete invoice <strong>{invoiceToDelete?.id}</strong> from <strong>{invoiceToDelete?.supplier_name}</strong>?
+              <br /><br />
+              <span className="text-red-600 font-semibold">
+                This action cannot be undone. The invoice and all its line items will be permanently removed.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteInvoice}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Invoice
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

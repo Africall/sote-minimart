@@ -37,7 +37,8 @@ const searchInBarcode = (barcode: string | string[] | undefined, searchQuery: st
 const InventoryDashboardPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [addProductOpen, setAddProductOpen] = useState(false);
-  const [restockOpen, setRestockOpen] = useState(false);
+  // RESTOCK STATE COMMENTED OUT FOR SAFETY
+  // const [restockOpen, setRestockOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<FrontendProduct | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -57,7 +58,8 @@ const InventoryDashboardPage = () => {
     actionLoading,
     handleAddProduct,
     handleEditProduct,
-    handleRestock,
+    // RESTOCK HANDLER COMMENTED OUT FOR SAFETY
+    // handleRestock,
     handleMarkExpired
   } = useInventoryActions(fetchInventoryData);
 
@@ -162,10 +164,12 @@ const InventoryDashboardPage = () => {
         lowStockItems={filteredLowStockItems}
         expiringItems={filteredExpiringItems}
         loading={loading}
-        onRestock={(product) => {
-          setSelectedProduct(product);
-          setRestockOpen(true);
-        }}
+        // RESTOCK HANDLER COMMENTED OUT FOR SAFETY
+        // onRestock={(product) => {
+        //   setSelectedProduct(product);
+        //   setRestockOpen(true);
+        // }}
+        onRestock={() => {}}
         onEdit={(product) => {
           setSelectedProduct(product);
           setEditOpen(true);
@@ -177,15 +181,19 @@ const InventoryDashboardPage = () => {
       <InventoryDialogs
         addProductOpen={addProductOpen}
         editOpen={editOpen}
-        restockOpen={restockOpen}
+        // RESTOCK PROPS COMMENTED OUT FOR SAFETY
+        // restockOpen={restockOpen}
+        restockOpen={false}
         selectedProduct={selectedProduct}
         actionLoading={actionLoading}
         onAddProductOpenChange={setAddProductOpen}
         onEditOpenChange={setEditOpen}
-        onRestockOpenChange={setRestockOpen}
+        // onRestockOpenChange={setRestockOpen}
+        onRestockOpenChange={() => {}}
         onAddProduct={handleAddProduct}
         onEditProduct={handleEditProduct}
-        onRestock={handleRestock}
+        // onRestock={handleRestock}
+        onRestock={async () => {}}
         onSelectedProductChange={setSelectedProduct}
       />
 
