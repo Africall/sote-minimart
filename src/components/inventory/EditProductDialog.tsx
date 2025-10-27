@@ -49,7 +49,8 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
   // Determine user permissions
   const isAdmin = profile?.role === 'admin';
   const isInventory = profile?.role === 'inventory';
-  const canEdit = isAdmin || isInventory;
+  const isCashier = profile?.role === 'cashier';
+  const canEdit = isAdmin || isInventory || isCashier;
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -124,8 +125,8 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
     try {
       const updateData: Partial<Product> = {};
 
-      // Admin can edit all fields
-      if (isAdmin) {
+      // Admin and cashiers can edit all fields
+      if (isAdmin || isCashier) {
         const cost = parseFloat(data.cost) || 0;
         const price = parseFloat(data.price) || 0;
         const reorderLevel = parseInt(data.reorder_level) || 10;
@@ -153,8 +154,8 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
         updateData.barcode = barcodeValue?.trim() ? [barcodeValue.trim()] : null;
       }
 
-      // Both admin and inventory can edit expiry dates and images
-      if (isAdmin || isInventory) {
+      // All users with edit permission can edit expiry dates and images
+      if (isAdmin || isInventory || isCashier) {
         updateData.expiry_date = expiryDate?.toISOString() || null;
         updateData.image_url = imageUrl?.trim() || null;
       }
@@ -197,7 +198,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
           </DialogHeader>
           <div className="py-4">
             <p className="text-muted-foreground">
-              Only administrators and inventory users can edit product details.
+              You don't have permission to edit product details.
             </p>
           </div>
           <div className="flex justify-end">
@@ -221,7 +222,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            {/* Product Image Upload - Available to admin and inventory */}
+            {/* Product Image Upload - Available to admin, inventory, and cashiers */}
             <ProductImageUpload 
               key={`${product.id}-${open}`}
               imageUrl={imageUrl}
@@ -231,8 +232,8 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Admin-only fields */}
-              {isAdmin && (
+              {/* Admin and Cashier fields */}
+              {(isAdmin || isCashier) && (
                 <>
                   <FormField
                     control={form.control}
@@ -364,8 +365,8 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
                 </>
               )}
 
-              {/* Read-only fields for inventory users */}
-              {isInventory && (
+              {/* Read-only fields for inventory users only */}
+              {isInventory && !isAdmin && !isCashier && (
                 <>
                   <FormItem>
                     <FormLabel>Product Name</FormLabel>
@@ -401,7 +402,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
                 </div>
               </FormItem>
               
-              {/* Expiry date - available to admin and inventory */}
+              {/* Expiry date - available to admin, inventory, and cashiers */}
               <FormItem>
                 <FormLabel>Expiry Date (Optional)</FormLabel>
                 <Popover>

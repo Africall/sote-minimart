@@ -25,7 +25,7 @@ import logo from "@/assets/logo.png";
 const getMenuItems = (role: string) => {
   const allItems = [
     { icon: Home, label: "Dashboard", path: "/dashboard", roles: ["admin"] },
-    { icon: Package, label: "Inventory", path: "/inventory", roles: ["admin", "inventory"] },
+    { icon: Package, label: "Inventory", path: "/inventory", roles: ["admin", "inventory", "cashier"] },
     { icon: DollarSign, label: "Price Management", path: "/price-management", roles: ["admin", "inventory"] },
     { icon: PlusCircle, label: "Add Product", path: "/add-product", roles: ["admin", "inventory"] },
     { icon: ShoppingCart, label: "POS", path: "/cashier-pos", roles: ["admin", "cashier"] },
