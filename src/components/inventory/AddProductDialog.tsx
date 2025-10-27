@@ -38,7 +38,7 @@ export const AddProductDialog: React.FC<AddProductDialogProps> = ({
     description: '',
     price: '',
     cost: '',
-    stock_quantity: '',
+    stock_quantity: '0',
     reorder_level: '10',
     expiry_date: '',
     supplier_id: '',
@@ -105,7 +105,7 @@ export const AddProductDialog: React.FC<AddProductDialogProps> = ({
         description: '',
         price: '',
         cost: '',
-        stock_quantity: '',
+        stock_quantity: '0',
         reorder_level: '10',
         expiry_date: '',
         supplier_id: '',
@@ -259,7 +259,8 @@ export const AddProductDialog: React.FC<AddProductDialogProps> = ({
                 type="number"
                 min="0"
                 value={formData.stock_quantity}
-                onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
+                disabled
+                className="bg-muted cursor-not-allowed"
                 required
               />
             </div>
