@@ -1,20 +1,22 @@
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, FileDown, Plus } from 'lucide-react';
+import { Search, FileDown, Plus, ArrowRightLeft } from 'lucide-react';
 
 interface InventoryHeaderProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   onExport: () => void;
   onAddProduct: () => void;
+  onTransferStock?: () => void;
 }
 
 export const InventoryHeader = ({ 
   searchQuery, 
   onSearchChange, 
   onExport, 
-  onAddProduct 
+  onAddProduct,
+  onTransferStock
 }: InventoryHeaderProps) => {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -39,6 +41,12 @@ export const InventoryHeader = ({
           <FileDown className="mr-2 h-4 w-4" />
           Export
         </Button>
+        {onTransferStock && (
+          <Button onClick={onTransferStock} variant="outline">
+            <ArrowRightLeft className="mr-2 h-4 w-4" />
+            Transfer Stock
+          </Button>
+        )}
         <Button onClick={onAddProduct}>
           <Plus className="mr-2 h-4 w-4" />
           Add Product

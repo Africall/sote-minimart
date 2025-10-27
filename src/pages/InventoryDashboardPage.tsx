@@ -7,6 +7,7 @@ import { InventoryStats } from '@/components/inventory/InventoryStats';
 import { InventoryHeader } from '@/components/inventory/InventoryHeader';
 import { InventoryTabs } from '@/components/inventory/InventoryTabs';
 import { InventoryDialogs } from '@/components/inventory/InventoryDialogs';
+import { TransferStockDialog } from '@/components/inventory/TransferStockDialog';
 import { convertToFrontendProduct } from '@/utils/inventoryHelpers';
 import { deleteProduct } from '@/utils/supabaseUtils';
 import { toast } from 'sonner';
@@ -44,6 +45,7 @@ const InventoryDashboardPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<FrontendProduct | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [transferStockOpen, setTransferStockOpen] = useState(false);
 
   const {
     products,
@@ -150,6 +152,7 @@ const InventoryDashboardPage = () => {
         onSearchChange={setSearchQuery}
         onExport={() => handleExport(products)}
         onAddProduct={() => setAddProductOpen(true)}
+        onTransferStock={() => setTransferStockOpen(true)}
       />
       
       <InventoryStats
@@ -221,6 +224,13 @@ const InventoryDashboardPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Transfer Stock Dialog */}
+      <TransferStockDialog
+        open={transferStockOpen}
+        onOpenChange={setTransferStockOpen}
+        onTransferComplete={fetchInventoryData}
+      />
     </div>
   );
 };

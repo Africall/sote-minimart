@@ -2,12 +2,14 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Loader2, ArrowRightLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPaginatedProducts } from '@/utils/reportUtils';
 import { usePagination } from '@/hooks/usePagination';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { TransferStockDialog } from '@/components/inventory/TransferStockDialog';
 
 interface InventoryItem {
   'Product Name': string;
@@ -21,6 +23,8 @@ const InventoryPage = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const queryClient = useQueryClient();
 
   // Debounce search to reduce unnecessary queries
   useEffect(() => {
@@ -80,6 +84,12 @@ const InventoryPage = () => {
     setCurrentPage(page);
   }, []);
 
+  const handleTransferComplete = useCallback(() => {
+    // Invalidate and refetch the inventory query
+    queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    toast.success('Inventory refreshed');
+  }, [queryClient]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -89,6 +99,10 @@ const InventoryPage = () => {
             Manage your product inventory and stock levels
           </p>
         </div>
+        <Button onClick={() => setShowTransferDialog(true)} className="gap-2">
+          <ArrowRightLeft className="h-4 w-4" />
+          Transfer Stock
+        </Button>
       </div>
 
       <div className="space-y-4">
@@ -171,6 +185,13 @@ const InventoryPage = () => {
           </>
         )}
       </div>
+
+      {/* Transfer Stock Dialog */}
+      <TransferStockDialog
+        open={showTransferDialog}
+        onOpenChange={setShowTransferDialog}
+        onTransferComplete={handleTransferComplete}
+      />
     </div>
   );
 };
