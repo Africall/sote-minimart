@@ -70,7 +70,7 @@ export const AddProductDialog: React.FC<AddProductDialogProps> = ({
     const numericFields = {
       price: parseFloat(formData.price) || 0,
       cost: parseFloat(formData.cost) || 0,
-      stock_quantity: parseInt(formData.stock_quantity) || 0,
+      stock_quantity: 0, // Always 0 for new products
       reorder_level: parseInt(formData.reorder_level) || 10
     };
 
@@ -83,7 +83,7 @@ export const AddProductDialog: React.FC<AddProductDialogProps> = ({
       description: formData.description || null,
       price: numericFields.price,
       cost: numericFields.cost,
-      stock_quantity: numericFields.stock_quantity,
+      stock_quantity: 0, // Explicitly set to 0 for new products
       reorder_level: numericFields.reorder_level,
       expiry_date: formData.expiry_date || null,
       supplier_id: formData.supplier_id || null,
@@ -91,7 +91,8 @@ export const AddProductDialog: React.FC<AddProductDialogProps> = ({
       is_featured: formData.is_featured
     };
 
-    console.log('AddProductDialog: Submitting product data:', productData);
+    console.log('AddProductDialog: Submitting product data with stock_quantity:', productData.stock_quantity);
+    console.log('Full product data:', productData);
 
     try {
       await onSubmit(productData);
