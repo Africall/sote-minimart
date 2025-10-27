@@ -44,6 +44,8 @@ interface TransactionDetail {
   unit_price: number;
   total: number;
   reference: string;
+  cashier_name?: string;
+  cashier_id?: string;
 }
 
 const StockMovementReportPage = () => {
@@ -176,19 +178,42 @@ const StockMovementReportPage = () => {
 
       if (purchaseError) throw purchaseError;
 
-      // Fetch sales
+      // Fetch sales with cashier information
       const { data: sales, error: saleError } = await supabase
         .from('sale_items')
         .select(`
           quantity,
           unit_price,
-          sales!inner(created_at, id)
+          sales!inner(created_at, id, cashier_id)
         `)
         .eq('product_id', productId)
         .gte('sales.created_at', startDate)
         .lte('sales.created_at', endDate + 'T23:59:59');
 
       if (saleError) throw saleError;
+
+      // Get unique cashier IDs from sales
+      const cashierIds = Array.from(new Set(
+        sales?.map((s: any) => s.sales.cashier_id).filter(Boolean) || []
+      ));
+
+      // Fetch cashier profiles
+      let cashierProfiles: any[] = [];
+      if (cashierIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .in('id', cashierIds);
+
+        if (!profilesError && profiles) {
+          cashierProfiles = profiles;
+        }
+      }
+
+      // Create a map of cashier IDs to names
+      const cashierMap = new Map(
+        cashierProfiles.map(profile => [profile.id, profile.name])
+      );
 
       const details: TransactionDetail[] = [];
 
@@ -204,8 +229,13 @@ const StockMovementReportPage = () => {
         });
       });
 
-      // Add sale transactions
+      // Add sale transactions with cashier info
       sales?.forEach((s: any) => {
+        const cashierId = s.sales.cashier_id;
+        const cashierName = cashierId 
+          ? (cashierMap.get(cashierId) || `Cashier ${cashierId.slice(-4)}`)
+          : 'Unknown';
+
         details.push({
           date: s.sales.created_at,
           type: 'sale',
@@ -213,6 +243,8 @@ const StockMovementReportPage = () => {
           unit_price: s.unit_price,
           total: s.quantity * s.unit_price,
           reference: s.sales.id.substring(0, 8),
+          cashier_name: cashierName,
+          cashier_id: cashierId,
         });
       });
 
@@ -642,8 +674,9 @@ const StockMovementReportPage = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
+                    <TableHead>Date & Time</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Cashier/Source</TableHead>
                     <TableHead className="text-right">Quantity</TableHead>
                     <TableHead className="text-right">Unit Price</TableHead>
                     <TableHead className="text-right">Total</TableHead>
@@ -653,7 +686,7 @@ const StockMovementReportPage = () => {
                 <TableBody>
                   {transactionDetails.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-10">
+                      <TableCell colSpan={7} className="text-center py-10">
                         No transactions found for the selected period
                       </TableCell>
                     </TableRow>
@@ -661,7 +694,14 @@ const StockMovementReportPage = () => {
                     transactionDetails.map((detail, index) => (
                       <TableRow key={index}>
                         <TableCell>
-                          {format(new Date(detail.date), 'MMM dd, yyyy HH:mm')}
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {format(new Date(detail.date), 'MMM dd, yyyy')}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(detail.date), 'HH:mm:ss')}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <span
@@ -674,9 +714,23 @@ const StockMovementReportPage = () => {
                             {detail.type.toUpperCase()}
                           </span>
                         </TableCell>
+                        <TableCell>
+                          {detail.type === 'sale' && detail.cashier_name ? (
+                            <div className="flex flex-col">
+                              <span className="font-medium">{detail.cashier_name}</span>
+                              <span className="text-xs text-muted-foreground">Cashier</span>
+                            </div>
+                          ) : detail.type === 'purchase' ? (
+                            <span className="text-muted-foreground">Supplier</span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-medium">
-                          {detail.type === 'purchase' ? '+' : '-'}
-                          {detail.quantity}
+                          <span className={detail.type === 'purchase' ? 'text-green-600' : 'text-red-600'}>
+                            {detail.type === 'purchase' ? '+' : '-'}
+                            {detail.quantity}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right">
                           KSh {detail.unit_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
