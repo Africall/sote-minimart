@@ -56,7 +56,7 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
     due_date: '',
     issue_date: new Date().toISOString().split('T')[0],
     payment_terms: 'Net 30',
-    status: 'draft'
+    status: 'unpaid'
   });
   
   const [lineItems, setLineItems] = useState<LineItem[]>([
@@ -268,8 +268,7 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
       if (lineItemsError) throw lineItemsError;
 
       // Update inventory stock for products when creating new invoice (not editing)
-      // Only update stock if status is not 'draft'
-      if (!invoice?.id && formData.status !== 'draft') {
+      if (!invoice?.id) {
         console.log('=== STARTING INVENTORY UPDATE ===');
         console.log('Line items to process:', lineItems);
         
@@ -331,11 +330,10 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
           });
         }
       } else {
-        const reason = invoice?.id ? 'editing existing invoice' : 'draft status';
-        console.log(`Skipping inventory update - reason: ${reason}`);
+        console.log(`Skipping inventory update - reason: editing existing invoice`);
         toast({
           title: 'Success',
-          description: `Supplier invoice ${invoice?.id ? 'updated' : 'created'} successfully${formData.status === 'draft' ? ' (draft - inventory not updated)' : ''}`,
+          description: `Supplier invoice updated successfully`,
         });
       }
 
@@ -362,7 +360,7 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
       due_date: '',
       issue_date: new Date().toISOString().split('T')[0],
       payment_terms: 'Net 30',
-      status: 'draft'
+      status: 'unpaid'
     });
     setLineItems([{
       product_name: '',
@@ -466,7 +464,6 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="unpaid">Unpaid</SelectItem>
                   <SelectItem value="partially-paid">Partially Paid</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
