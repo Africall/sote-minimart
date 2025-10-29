@@ -45,13 +45,28 @@ export const RecordPaymentDialog: React.FC<RecordPaymentDialogProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const outstandingAmount = invoice.outstanding_balance || (invoice.total_amount || invoice.amount) - invoice.amount_paid;
-  const maxPaymentAmount = outstandingAmount;
+  
+  // Handle floating-point precision issues - treat balances < 0.01 as fully paid
+  const MINIMUM_PAYMENT = 0.01;
+  const isEffectivelyPaid = outstandingAmount < MINIMUM_PAYMENT;
+  const maxPaymentAmount = isEffectivelyPaid ? 0 : outstandingAmount;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
+      // Check if invoice is effectively paid due to floating-point precision
+      if (isEffectivelyPaid) {
+        toast({
+          title: 'Invoice Already Paid',
+          description: 'This invoice has been fully paid (remaining balance is less than KSh 0.01)',
+          variant: 'destructive',
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       const paymentAmount = parseFloat(formData.amount);
       if (Number.isNaN(paymentAmount)) {
         toast({
@@ -62,16 +77,16 @@ export const RecordPaymentDialog: React.FC<RecordPaymentDialogProps> = ({
         return;
       }
       
-      if (paymentAmount <= 0) {
+      if (paymentAmount < MINIMUM_PAYMENT) {
         toast({
           title: 'Invalid Amount',
-          description: 'Payment amount must be greater than zero',
+          description: `Payment amount must be at least KSh ${MINIMUM_PAYMENT.toFixed(2)}`,
           variant: 'destructive',
         });
         return;
       }
 
-      if (paymentAmount > maxPaymentAmount) {
+      if (paymentAmount > maxPaymentAmount + MINIMUM_PAYMENT) {
         toast({
           title: 'Amount Too High',
           description: `Payment amount cannot exceed outstanding balance of KSh ${maxPaymentAmount.toFixed(2)}`,
@@ -164,7 +179,9 @@ export const RecordPaymentDialog: React.FC<RecordPaymentDialogProps> = ({
   };
 
   const setFullPayment = () => {
-    setFormData({ ...formData, amount: maxPaymentAmount.toString() });
+    if (!isEffectivelyPaid) {
+      setFormData({ ...formData, amount: maxPaymentAmount.toFixed(2) });
+    }
   };
 
   const scrollToSubmit = (smooth = true) => {
@@ -224,18 +241,29 @@ export const RecordPaymentDialog: React.FC<RecordPaymentDialogProps> = ({
                   id="amount"
                   type="number"
                   min="0.01"
-                  max={maxPaymentAmount}
+                  max={isEffectivelyPaid ? undefined : maxPaymentAmount}
                   step="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                   onFocus={() => scrollToSubmit()}
                   placeholder="0.00"
                   required
+                  disabled={isEffectivelyPaid}
                 />
-                <Button type="button" variant="outline" onClick={setFullPayment}>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={setFullPayment}
+                  disabled={isEffectivelyPaid}
+                >
                   Full
                 </Button>
               </div>
+              {isEffectivelyPaid && (
+                <p className="text-sm text-yellow-600">
+                  This invoice is fully paid (remaining balance less than KSh 0.01)
+                </p>
+              )}
             </div>
             
             <div className="space-y-2">
