@@ -28,6 +28,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (newPassword: string) => Promise<void>;
   isAuthenticated: boolean;
   hasPermission: (requiredRoles: UserRole[]) => boolean;
 }
@@ -108,6 +110,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('AuthProvider: Navigating to role-based route:', userProfile.role);
           }
         }, 0);
+      } else if (event === 'PASSWORD_RECOVERY') {
+        // When user clicks password reset link, don't redirect - let them stay on reset page
+        console.log('AuthProvider: Password recovery detected');
+        setSession(session);
+        setUser(session?.user || null);
       } else if (event === 'SIGNED_OUT') {
         console.log('AuthProvider: User signed out');
         setSession(null);
@@ -356,6 +363,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (error) {
         console.error('AuthProvider: Logout error:', error);
         toast.error('Logout failed. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    requestPasswordReset: async (email: string) => {
+      try {
+        setLoading(true);
+        console.log('AuthProvider: Password reset request for:', email);
+
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+
+        if (error) {
+          console.error('AuthProvider: Password reset error:', error);
+          toast.error(error.message || 'Failed to send password reset email. Please try again.');
+          return;
+        }
+
+        toast.success('Password reset email sent! Please check your inbox.');
+      } catch (error) {
+        console.error('AuthProvider: Password reset exception:', error);
+        toast.error('Network error. Please check your connection and try again.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    resetPassword: async (newPassword: string) => {
+      try {
+        setLoading(true);
+        console.log('AuthProvider: Updating password...');
+
+        const { error } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+
+        if (error) {
+          console.error('AuthProvider: Password update error:', error);
+          toast.error(error.message || 'Failed to update password. Please try again.');
+          return;
+        }
+
+        toast.success('Password updated successfully! You can now log in with your new password.');
+        navigate('/login');
+      } catch (error) {
+        console.error('AuthProvider: Password update exception:', error);
+        toast.error('Network error. Please check your connection and try again.');
       } finally {
         setLoading(false);
       }

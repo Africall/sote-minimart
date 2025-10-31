@@ -56,16 +56,14 @@ const LoginPage: React.FC = () => {
     <div className="min-h-screen w-full bg-gradient-to-b from-primary/10 via-background to-secondary/5 flex items-start md:items-center justify-center p-6">
       <Card className="w-full max-w-lg overflow-hidden shadow-xl border-blue-100">
         {/* ✅ Blue Header with Logo Inside */}
-        <div className="bg-gradient-to-b from-blue-700 to-blue-600 text-white px-6 pb-10 pt-8 text-center relative rounded-b-none">
-          <div className="flex justify-center mb-4">
-            <img
-              src={logo}
-              alt="SOTE MINIMART"
-              className="h-20 w-auto bg-white rounded-xl p-2 drop-shadow-md"
-            />
+        <div className="bg-gradient-to-b from-royal-blue-600 to-primary text-white px-6 pb-8 pt-8 text-center">
+          <div className="flex justify-center mb-6">
+            <div className="bg-white rounded-2xl shadow-lg px-6 py-3">
+              <img src={logo} alt="Sote Minimart" className="h-10 w-auto" />
+            </div>
           </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold mt-1">Welcome Back!</h1>
-          <p className="opacity-90 text-sm">Sign in to access your POS system</p>
+          <h1 className="text-2xl md:text-3xl font-extrabold">Welcome Back!</h1>
+          <p className="opacity-90">Sign in to access your POS system</p>
         </div>
 
         <CardContent className="p-6">

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth, UserRole } from "@/contexts/AuthContext";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -155,9 +156,9 @@ export default function AuthPage() {
                     />
                     Remember me
                   </label>
-                  <a className="text-primary hover:underline" href="#">
+                  <Link to="/forgot-password" className="text-primary hover:underline">
                     Forgot Password?
-                  </a>
+                  </Link>
                 </div>
 
                 <Button

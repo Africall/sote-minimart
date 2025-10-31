@@ -23,6 +23,8 @@ import UserManagementPage from '@/pages/UserManagementPage';
 import SettingsPage from '@/pages/SettingsPage';
 import LoginPage from '@/pages/LoginPage';
 import AuthPage from '@/pages/AuthPage';
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import DashboardPage from '@/pages/DashboardPage';
 import RestockPage from '@/pages/RestockPage';
 import InventoryMovementPage from '@/pages/InventoryMovementPage';
@@ -44,6 +46,8 @@ function App() {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/auth" element={<AuthPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/unauthorized" element={<UnauthorizedPage />} />
                 <Route path="/*" element={
                   <AppLayout>
