@@ -25,7 +25,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const stockQuantity = product.quantity || 0;
   const reorderLevel = product.reorderLevel || 10;
   const isLowStock = stockQuantity <= reorderLevel;
-  const canEdit = profile?.role === 'admin' || profile?.role === 'inventory' || profile?.role === 'cashier';
+  const canEdit = profile?.role === 'admin' || profile?.role === 'inventory';
 
   return (
     <Card className="h-fit hover:shadow-md transition-shadow">

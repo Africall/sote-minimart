@@ -6,6 +6,7 @@ import { AlertTriangle, Package, ArrowUpDown, Edit } from 'lucide-react';
 import { formatCurrency } from '@/utils/supabaseUtils';
 import { Product as FrontendProduct } from '@/types/product';
 import { ProductImage } from './ProductImage';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ProductTableProps {
   products: FrontendProduct[];
@@ -23,6 +24,8 @@ export const ProductTable: React.FC<ProductTableProps> = ({
   onRestock,
   onEdit
 }) => {
+  const { profile } = useAuth();
+  const canEdit = profile?.role === 'admin' || profile?.role === 'inventory';
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -184,14 +187,16 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => onEdit?.(product)}
-                          >
-                            <Edit className="w-3 h-3 mr-1" />
-                            Edit
-                          </Button>
+                          {canEdit && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => onEdit?.(product)}
+                            >
+                              <Edit className="w-3 h-3 mr-1" />
+                              Edit
+                            </Button>
+                          )}
                           {/* RESTOCK BUTTON COMMENTED OUT FOR SAFETY */}
                           {/* <Button 
                             variant="outline" 
