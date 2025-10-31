@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth, UserRole } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -53,9 +54,9 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-b from-primary/10 via-background to-secondary/5 flex items-start md:items-center justify-center p-6">
-      <Card className="w-full max-w-lg overflow-hidden shadow-xl border-blue-100">
-        {/* ✅ Blue Header with Logo Inside */}
+    <div className="min-h-screen w-full bg-gradient-to-b from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4">
+      <Card className="w-full max-w-lg shadow-xl border-blue-100 overflow-hidden">
+        {/* Royal-blue top header with logo */}
         <div className="bg-gradient-to-b from-royal-blue-600 to-primary text-white px-6 pb-8 pt-8 text-center">
           <div className="flex justify-center mb-6">
             <div className="bg-white rounded-2xl shadow-lg px-6 py-3">
@@ -143,14 +144,14 @@ const LoginPage: React.FC = () => {
                     />
                     Remember me
                   </label>
-                  <a className="text-primary hover:underline" href="#">
+                  <Link to="/forgot-password" className="text-primary hover:underline">
                     Forgot Password?
-                  </a>
+                  </Link>
                 </div>
 
                 <Button
                   type="submit"
-                  className="w-full h-12 text-base bg-gradient-to-r from-blue-700 to-blue-500 hover:opacity-95"
+                  className="w-full h-12 text-base bg-gradient-to-r from-royal-blue-600 to-primary hover:opacity-95"
                   disabled={loading}
                 >
                   {loading ? (
@@ -245,7 +246,7 @@ const LoginPage: React.FC = () => {
 
                 <Button
                   type="submit"
-                  className="w-full h-12 text-base bg-gradient-to-r from-blue-700 to-blue-500 hover:opacity-95"
+                  className="w-full h-12 text-base bg-gradient-to-r from-royal-blue-600 to-primary hover:opacity-95"
                   disabled={loading}
                 >
                   {loading ? (
