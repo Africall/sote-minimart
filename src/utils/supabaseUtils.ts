@@ -143,19 +143,15 @@ export const updateProduct = async (id: string, product: Database['public']['Tab
   try {
     console.log('updateProduct called with:', { id, product });
     
-    // CRITICAL: Remove stock_quantity from updates - stock must be changed via update_product_stock RPC only
-    const { stock_quantity, ...productWithoutStock } = product;
-    
-    if (stock_quantity !== undefined) {
-      console.warn('BLOCKED: stock_quantity in updateProduct. Use update_product_stock() instead.');
-    }
-    
-    // Ensure required fields are not null/undefined
+    // Allow stock_quantity updates for admin users
+    // The update_product_stock RPC is still available for restock operations
     const sanitizedProduct = {
-      ...productWithoutStock,
+      ...product,
       // Make sure cost and price are never null if they're being updated
-      ...(productWithoutStock.cost !== undefined && { cost: productWithoutStock.cost }),
-      ...(productWithoutStock.price !== undefined && { price: productWithoutStock.price }),
+      ...(product.cost !== undefined && { cost: product.cost }),
+      ...(product.price !== undefined && { price: product.price }),
+      // Include stock_quantity if provided (for admin edits)
+      ...(product.stock_quantity !== undefined && { stock_quantity: product.stock_quantity }),
       // Set updated_at timestamp
       updated_at: new Date().toISOString()
     };

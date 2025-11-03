@@ -35,30 +35,28 @@ export const useInventoryActions = (onDataChange: () => Promise<void>) => {
       setActionLoading(true);
       console.log('handleEditProduct: Starting update for product:', productId, productData);
       
-      // CRITICAL FIX: Remove stock_quantity if accidentally included
-      const { stock_quantity, ...safeData } = productData;
-      
-      if (stock_quantity !== undefined) {
-        console.warn('PREVENTED: stock_quantity was in edit data, removing it:', stock_quantity);
-        toast.warning('Stock quantity cannot be edited here. Use Restock button.');
-      }
-      
       // Create a clean update object with only the fields that should be updated
       const updateData: Partial<Product> = {};
       
-      // Only add fields that are defined in safeData (no stock_quantity)
-      if (safeData.name !== undefined) updateData.name = safeData.name;
-      if (safeData.category !== undefined) updateData.category = safeData.category;
-      if (safeData.cost !== undefined) updateData.cost = safeData.cost;
-      if (safeData.price !== undefined) updateData.price = safeData.price;
-      if (safeData.reorder_level !== undefined) updateData.reorder_level = safeData.reorder_level;
-      if (safeData.sku !== undefined) updateData.sku = safeData.sku;
-      if (safeData.barcode !== undefined) updateData.barcode = safeData.barcode;
-      if (safeData.expiry_date !== undefined) updateData.expiry_date = safeData.expiry_date;
-      if (safeData.image_url !== undefined) updateData.image_url = safeData.image_url;
-      if (safeData.description !== undefined) updateData.description = safeData.description;
-      if (safeData.is_featured !== undefined) updateData.is_featured = safeData.is_featured;
-      if (safeData.supplier_id !== undefined) updateData.supplier_id = safeData.supplier_id;
+      // Add all fields that are defined in productData
+      if (productData.name !== undefined) updateData.name = productData.name;
+      if (productData.category !== undefined) updateData.category = productData.category;
+      if (productData.cost !== undefined) updateData.cost = productData.cost;
+      if (productData.price !== undefined) updateData.price = productData.price;
+      if (productData.reorder_level !== undefined) updateData.reorder_level = productData.reorder_level;
+      if (productData.sku !== undefined) updateData.sku = productData.sku;
+      if (productData.barcode !== undefined) updateData.barcode = productData.barcode;
+      if (productData.expiry_date !== undefined) updateData.expiry_date = productData.expiry_date;
+      if (productData.image_url !== undefined) updateData.image_url = productData.image_url;
+      if (productData.description !== undefined) updateData.description = productData.description;
+      if (productData.is_featured !== undefined) updateData.is_featured = productData.is_featured;
+      if (productData.supplier_id !== undefined) updateData.supplier_id = productData.supplier_id;
+      
+      // Allow stock_quantity updates (for admins)
+      if (productData.stock_quantity !== undefined) {
+        updateData.stock_quantity = productData.stock_quantity;
+        console.log('handleEditProduct: Including stock_quantity in update:', productData.stock_quantity);
+      }
       
       // Always set updated_at
       updateData.updated_at = new Date().toISOString();

@@ -22,6 +22,7 @@ interface FormValues {
   cost: string;
   price: string;
   reorder_level: string;
+  stock_quantity: string;
   expiryDate?: Date;
   sku: string;
   barcode: string;
@@ -59,6 +60,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
       cost: '',
       price: '',
       reorder_level: '',
+      stock_quantity: '',
       sku: '',
       barcode: '',
     }
@@ -80,6 +82,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
         cost: product.buyingPrice?.toString() || '0',
         price: product.sellingPrice?.toString() || '0',
         reorder_level: product.reorderLevel?.toString() || '10',
+        stock_quantity: product.quantity?.toString() || '0',
         sku: product.barcode || '',
         barcode: product.barcode || '',
       });
@@ -130,6 +133,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
         const cost = parseFloat(data.cost) || 0;
         const price = parseFloat(data.price) || 0;
         const reorderLevel = parseInt(data.reorder_level) || 10;
+        const stockQuantity = parseInt(data.stock_quantity) || 0;
 
         if (price < 0) {
           toast.error('Price cannot be negative');
@@ -138,6 +142,11 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
 
         if (cost < 0) {
           toast.error('Cost cannot be negative');
+          return;
+        }
+
+        if (stockQuantity < 0) {
+          toast.error('Stock quantity cannot be negative');
           return;
         }
 
@@ -152,6 +161,11 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
         updateData.reorder_level = reorderLevel;
         updateData.sku = skuValue?.trim() || null;
         updateData.barcode = barcodeValue?.trim() ? [barcodeValue.trim()] : null;
+        
+        // Only admins can update stock quantity
+        if (isAdmin) {
+          updateData.stock_quantity = stockQuantity;
+        }
       }
 
       // All users with edit permission can edit expiry dates and images
@@ -162,9 +176,6 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
 
       // Always set updated_at
       updateData.updated_at = new Date().toISOString();
-
-      // CRITICAL: Never update stock_quantity in edit dialog
-      // Stock changes must only be done through dedicated restock functionality
 
       console.log('EditProductDialog: Sending update data:', {
         productId: product.id,
@@ -391,16 +402,41 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
                 </>
               )}
               
-              {/* Stock quantity display - read-only for all users */}
-              <FormItem>
-                <FormLabel>Current Stock Quantity</FormLabel>
-                <div className="p-3 bg-muted rounded-md">
-                  <span className="text-sm font-medium">{product.quantity || 0} units</span>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Use the restock feature to adjust stock quantities
-                  </p>
-                </div>
-              </FormItem>
+              {/* Stock quantity - editable for admins, read-only for others */}
+              {isAdmin ? (
+                <FormField
+                  control={form.control}
+                  name="stock_quantity"
+                  rules={{ 
+                    required: 'Stock quantity is required',
+                    min: { value: 0, message: 'Stock quantity must be 0 or greater' }
+                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stock Quantity*</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          placeholder="Enter stock quantity"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <FormItem>
+                  <FormLabel>Current Stock Quantity</FormLabel>
+                  <div className="p-3 bg-muted rounded-md">
+                    <span className="text-sm font-medium">{product.quantity || 0} units</span>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Only admins can edit stock quantity
+                    </p>
+                  </div>
+                </FormItem>
+              )}
               
               {/* Expiry date - available to admin, inventory, and cashiers */}
               <FormItem>
