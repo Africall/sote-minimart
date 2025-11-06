@@ -22,6 +22,7 @@ interface LineItem {
   quantity: number;
   unit_cost: number;
   total: number;
+  expiry_date?: string;
 }
 
 interface SupplierInvoice {
@@ -66,6 +67,7 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
       quantity: 1,
       unit_cost: 0,
       total: 0,
+      expiry_date: '',
     }
   ]);
   
@@ -81,7 +83,6 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
       fetchSuppliers();
       
       if (invoice) {
-        // Populate form for editing
         setFormData({
           supplier_name: invoice.supplier_name,
           supplier_invoice_number: invoice.supplier_invoice_number || '',
@@ -92,6 +93,8 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
           status: invoice.status,
         });
         fetchInvoiceDetails(invoice.id);
+      } else {
+        resetForm();
       }
     }
   }, [open, invoice]);
@@ -126,7 +129,6 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
 
   const fetchInvoiceDetails = async (invoiceId: string) => {
     try {
-      // Fetch invoice details to get tax amount
       const { data: invoiceData, error: invoiceError } = await supabase
         .from('invoices')
         .select('tax_amount')
@@ -134,12 +136,8 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
         .single();
       
       if (invoiceError) throw invoiceError;
-      
-      if (invoiceData?.tax_amount) {
-        setManualTax(invoiceData.tax_amount);
-      }
+      if (invoiceData?.tax_amount) setManualTax(invoiceData.tax_amount);
 
-      // Fetch line items
       const { data: lineItemsData, error: lineItemsError } = await supabase
         .from('invoice_line_items')
         .select('*')
@@ -148,7 +146,10 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
       if (lineItemsError) throw lineItemsError;
       
       if (lineItemsData && lineItemsData.length > 0) {
-        setLineItems(lineItemsData);
+        setLineItems(lineItemsData.map(item => ({
+          ...item,
+          expiry_date: item.expiry_date || ''
+        })));
       }
     } catch (error) {
       console.error('Error fetching invoice details:', error);
@@ -157,18 +158,13 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
 
   const calculateLineItem = (item: LineItem): LineItem => {
     const total = item.quantity * item.unit_cost;
-    
-    return {
-      ...item,
-      total,
-    };
+    return { ...item, total };
   };
 
   const updateLineItem = (index: number, field: keyof LineItem, value: any) => {
     const updatedItems = [...lineItems];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
     
-    // If product is selected, populate name and cost
     if (field === 'product_id' && value) {
       const product = products.find(p => p.id === value);
       if (product) {
@@ -177,19 +173,21 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
       }
     }
     
-    // Recalculate totals
     updatedItems[index] = calculateLineItem(updatedItems[index]);
-    
     setLineItems(updatedItems);
   };
 
   const addLineItem = () => {
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    
     setLineItems([...lineItems, {
       product_name: '',
       description: '',
       quantity: 1,
       unit_cost: 0,
       total: 0,
+      expiry_date: thirtyDaysFromNow.toISOString().split('T')[0], // Auto 30 days
     }]);
   };
 
@@ -202,155 +200,124 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
   const calculateTotals = () => {
     const netAmount = lineItems.reduce((acc, item) => acc + item.total, 0);
     const finalTotal = netAmount + manualTax;
-    
-    return {
-      netAmount,
-      tax: manualTax,
-      total: finalTotal,
-    };
+    return { netAmount, tax: manualTax, total: finalTotal };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+  e.preventDefault();
+  setIsSubmitting(true);
 
-    try {
-      const totals = calculateTotals();
-      const invoiceId = invoice?.id || `SINV-${Date.now().toString().slice(-6)}`;
-      
-      // Create or update invoice
-      const invoiceData = {
-        id: invoiceId,
-        supplier_name: formData.supplier_name,
-        supplier_invoice_number: formData.supplier_invoice_number,
-        description: formData.description,
-        due_date: formData.due_date,
-        issue_date: formData.issue_date,
-        payment_terms: formData.payment_terms,
-        status: formData.status,
-        subtotal: totals.netAmount,
-        tax_amount: totals.tax,
-        total_amount: totals.total,
-        amount: totals.total,
-        amount_paid: invoice?.id ? undefined : 0, // Keep existing amount_paid if editing
-        outstanding_balance: totals.total - (invoice?.id ? 0 : 0), // Will be updated by trigger
-      };
+  try {
+    const totals = calculateTotals();
+    const invoiceId = invoice?.id || `SINV-${Date.now().toString().slice(-6)}`;
+    
+    const invoiceData = {
+      id: invoiceId,
+      supplier_name: formData.supplier_name,
+      supplier_invoice_number: formData.supplier_invoice_number,
+      description: formData.description,
+      due_date: formData.due_date,
+      issue_date: formData.issue_date,
+      payment_terms: formData.payment_terms,
+      status: formData.status,
+      subtotal: totals.netAmount,
+      tax_amount: totals.tax,
+      total_amount: totals.total,
+      amount: totals.total,
+      amount_paid: invoice?.id ? undefined : 0,
+      outstanding_balance: totals.total,
+    };
 
-      const { error: invoiceError } = invoice?.id 
-        ? await supabase.from('invoices').update(invoiceData).eq('id', invoice.id)
-        : await supabase.from('invoices').insert(invoiceData);
+    const { error: invoiceError } = invoice?.id 
+      ? await supabase.from('invoices').update(invoiceData).eq('id', invoice.id)
+      : await supabase.from('invoices').insert(invoiceData);
 
-      if (invoiceError) throw invoiceError;
+    if (invoiceError) throw invoiceError;
 
-      // Delete existing line items if editing
-      if (invoice?.id) {
-        await supabase.from('invoice_line_items').delete().eq('invoice_id', invoice.id);
-      }
-
-      // Insert line items
-      const lineItemsData = lineItems.map(item => ({
-        invoice_id: invoiceId,
-        product_id: item.product_id || null,
-        product_name: item.product_name,
-        description: item.description,
-        quantity: item.quantity,
-        unit_cost: item.unit_cost,
-        tax_rate: 0,
-        tax_amount: 0,
-        subtotal: item.total,
-        total: item.total,
-      }));
-
-      const { error: lineItemsError } = await supabase
-        .from('invoice_line_items')
-        .insert(lineItemsData);
-
-      if (lineItemsError) throw lineItemsError;
-
-      // Update inventory stock for products when creating new invoice (not editing)
-      if (!invoice?.id) {
-        console.log('=== STARTING INVENTORY UPDATE ===');
-        console.log('Line items to process:', lineItems);
-        
-        const stockUpdatePromises = lineItems
-          .filter(item => {
-            const hasProductId = !!item.product_id;
-            console.log(`Item "${item.product_name}": has product_id = ${hasProductId}, product_id = ${item.product_id}`);
-            return hasProductId;
-          })
-          .map(async (item) => {
-            try {
-              console.log(`Attempting to update stock for product ${item.product_id}, quantity: ${item.quantity}`);
-              
-              // Update stock using the RPC function (increases stock)
-              const { data: rpcData, error: stockError } = await supabase.rpc('update_product_stock', {
-                product_id_param: item.product_id!,
-                quantity_change: item.quantity
-              });
-
-              console.log(`RPC result for ${item.product_id}:`, { data: rpcData, error: stockError });
-
-              if (stockError) {
-                console.error(`Failed to update stock for product ${item.product_id}:`, stockError);
-                return { success: false, product: item.product_name, error: stockError.message };
-              }
-              
-              console.log(`Successfully updated stock for ${item.product_name}`);
-              return { success: true, product: item.product_name };
-            } catch (error) {
-              console.error(`Exception updating stock for product ${item.product_id}:`, error);
-              return { success: false, product: item.product_name, error: String(error) };
-            }
-          });
-
-        const stockUpdateResults = await Promise.all(stockUpdatePromises);
-        console.log('All stock update results:', stockUpdateResults);
-        
-        const failedUpdates = stockUpdateResults.filter(result => !result.success);
-
-        if (failedUpdates.length > 0) {
-          const failedProducts = failedUpdates.map(r => `${r.product} (${r.error || 'unknown error'})`).join(', ');
-          console.error('Failed updates:', failedProducts);
-          toast({
-            title: 'Partial Success',
-            description: `Invoice created but failed to update inventory for: ${failedProducts}`,
-            variant: 'destructive',
-          });
-        } else if (stockUpdateResults.length > 0) {
-          console.log('All stock updates successful!');
-          toast({
-            title: 'Success',
-            description: `Supplier invoice created and inventory updated for ${stockUpdateResults.length} product(s)`,
-          });
-        } else {
-          console.log('No products with product_id found to update');
-          toast({
-            title: 'Success',
-            description: `Supplier invoice created (no inventory items to update)`,
-          });
-        }
-      } else {
-        console.log(`Skipping inventory update - reason: editing existing invoice`);
-        toast({
-          title: 'Success',
-          description: `Supplier invoice updated successfully`,
-        });
-      }
-
-      onInvoiceCreated();
-      onOpenChange(false);
-      resetForm();
-    } catch (error) {
-      console.error('Error saving invoice:', error);
-      toast({
-        title: 'Error',
-        description: `Failed to ${invoice?.id ? 'update' : 'create'} supplier invoice`,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
+    if (invoice?.id) {
+      await supabase.from('invoice_line_items').delete().eq('invoice_id', invoice.id);
     }
-  };
+
+    const lineItemsData = lineItems.map(item => ({
+      invoice_id: invoiceId,
+      product_id: item.product_id || null,
+      product_name: item.product_name,
+      description: item.description,
+      quantity: item.quantity,
+      unit_cost: item.unit_cost,
+      tax_rate: 0,
+      tax_amount: 0,
+      subtotal: item.total,
+      total: item.total,
+      expiry_date: item.expiry_date || null,
+    }));
+
+    const { error: lineItemsError } = await supabase
+      .from('invoice_line_items')
+      .insert(lineItemsData);
+
+    if (lineItemsError) throw lineItemsError;
+
+    // ONLY ON CREATE: Update stock + expiry_queue
+    if (!invoice?.id) {
+      // 1. Update stock
+      const stockPromises = lineItems
+        .filter(item => item.product_id)
+        .map(item => supabase.rpc('update_product_stock', {
+          product_id_param: item.product_id!,
+          quantity_change: item.quantity
+        }));
+
+      const stockResults = await Promise.all(stockPromises);
+      const stockErrors = stockResults.filter(r => r.error);
+      if (stockErrors.length > 0) {
+        toast({ title: "Stock Warning", description: "Some stock updates failed", variant: "destructive" });
+      }
+
+      // 2. Push expiry dates to queue
+      const expiryUpdates = lineItems
+        .filter(item => item.product_id && item.expiry_date)
+        .map(async (item) => {
+          // First: GET current queue
+          const { data: product } = await supabase
+            .from('products')
+            .select('expiry_queue')
+            .eq('id', item.product_id!)
+            .single();
+
+          const currentQueue = product?.expiry_queue || [];
+          const newQueue = [...currentQueue, item.expiry_date!];
+
+          // Then: UPDATE with new array
+          const { error } = await supabase
+            .from('products')
+            .update({ expiry_queue: newQueue })
+            .eq('id', item.product_id!);
+
+          if (error) console.error('Expiry queue error:', error);
+        });
+
+      await Promise.all(expiryUpdates);
+    }
+
+    toast({ 
+      title: "Success", 
+      description: `Invoice ${invoice?.id ? 'updated' : 'created'} and expiry queue updated!` 
+    });
+
+    onInvoiceCreated();
+    onOpenChange(false);
+    resetForm();
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.message || "Failed to save",
+      variant: "destructive",
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const resetForm = () => {
     setFormData({
@@ -368,6 +335,7 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
       quantity: 1,
       unit_cost: 0,
       total: 0,
+      expiry_date: '',
     }]);
     setManualTax(0);
   };
@@ -382,116 +350,67 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Invoice Header */}
+          {/* Header Fields */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="supplier_name">Supplier Name</Label>
-              <Select value={formData.supplier_name} onValueChange={(value) => setFormData({ ...formData, supplier_name: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select supplier" />
-                </SelectTrigger>
+              <Label>Supplier Name</Label>
+              <Select value={formData.supplier_name} onValueChange={(v) => setFormData({ ...formData, supplier_name: v })}>
+                <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
                 <SelectContent>
-                  {suppliers.map((supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.name}>
-                      {supplier.name}
-                    </SelectItem>
-                  ))}
+                  {suppliers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Input
-                placeholder="Or enter supplier name"
+                placeholder="Or type manually"
                 value={formData.supplier_name}
                 onChange={(e) => setFormData({ ...formData, supplier_name: e.target.value })}
                 required
               />
             </div>
-            
             <div className="space-y-2">
-              <Label htmlFor="supplier_invoice_number">Supplier Invoice Number</Label>
+              <Label>Supplier Invoice #</Label>
               <Input
-                id="supplier_invoice_number"
                 value={formData.supplier_invoice_number}
                 onChange={(e) => setFormData({ ...formData, supplier_invoice_number: e.target.value })}
-                placeholder="Enter supplier's invoice number"
               />
             </div>
           </div>
-          
+
           <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="issue_date">Issue Date</Label>
-              <Input
-                id="issue_date"
-                type="date"
-                value={formData.issue_date}
-                onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="due_date">Due Date</Label>
-              <Input
-                id="due_date"
-                type="date"
-                value={formData.due_date}
-                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="payment_terms">Payment Terms</Label>
-              <Select value={formData.payment_terms} onValueChange={(value) => setFormData({ ...formData, payment_terms: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+            <div><Label>Issue Date</Label><Input type="date" value={formData.issue_date} onChange={e => setFormData({ ...formData, issue_date: e.target.value })} required /></div>
+            <div><Label>Due Date</Label><Input type="date" value={formData.due_date} onChange={e => setFormData({ ...formData, due_date: e.target.value })} required /></div>
+            <div><Label>Terms</Label>
+              <Select value={formData.payment_terms} onValueChange={v => setFormData({ ...formData, payment_terms: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
                   <SelectItem value="Net 30">Net 30</SelectItem>
                   <SelectItem value="Net 60">Net 60</SelectItem>
-                  <SelectItem value="Net 90">Net 90</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+            <div><Label>Status</Label>
+              <Select value={formData.status} onValueChange={v => setFormData({ ...formData, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unpaid">Unpaid</SelectItem>
-                  <SelectItem value="partially-paid">Partially Paid</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={2}
-                placeholder="Invoice description or notes"
-              />
-            </div>
+            <div><Label>Description</Label><Textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} /></div>
           </div>
 
-          {/* Line Items */}
+          {/* LINE ITEMS */}
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>Line Items</CardTitle>
-                <Button type="button" variant="outline" onClick={addLineItem}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
+                <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Item
                 </Button>
               </div>
             </CardHeader>
@@ -499,54 +418,40 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product/Service</TableHead>
+                    <TableHead>Product</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead className="w-24">Qty</TableHead>
-                    <TableHead className="w-32">Unit Cost</TableHead>
-                    <TableHead className="w-32">Total</TableHead>
-                    <TableHead className="w-16"></TableHead>
+                    <TableHead className="w-20">Qty</TableHead>
+                    <TableHead className="w-28">Unit Cost</TableHead>
+                    <TableHead className="w-28">Total</TableHead>
+                    <TableHead className="w-36">Expiry Date</TableHead>
+                    <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {lineItems.map((item, index) => (
                     <TableRow key={index}>
                       <TableCell>
-                        <Popover 
-                          open={openProductCombobox[index]} 
-                          onOpenChange={(open) => setOpenProductCombobox({ ...openProductCombobox, [index]: open })}
-                        >
+                        <Popover open={openProductCombobox[index]} onOpenChange={open => setOpenProductCombobox({ ...openProductCombobox, [index]: open })}>
                           <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={openProductCombobox[index]}
-                              className="w-full justify-between"
-                            >
-                              {item.product_name || "Select product..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            <Button variant="outline" className="w-full justify-between">
+                              {item.product_name || "Select..."} <ChevronsUpDown className="h-4 w-4 ml-2 opacity-50" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-[300px] p-0">
+                          <PopoverContent className="w-80 p-0">
                             <Command>
                               <CommandInput placeholder="Search products..." />
                               <CommandList>
                                 <CommandEmpty>No product found.</CommandEmpty>
                                 <CommandGroup>
-                                  {products.map((product) => (
+                                  {products.map(product => (
                                     <CommandItem
                                       key={product.id}
-                                      value={product.name}
                                       onSelect={() => {
                                         updateLineItem(index, 'product_id', product.id);
                                         setOpenProductCombobox({ ...openProductCombobox, [index]: false });
                                       }}
                                     >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          item.product_id === product.id ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
+                                      <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
                                       {product.name}
                                     </CommandItem>
                                   ))}
@@ -557,44 +462,56 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
                         </Popover>
                         <Input
                           className="mt-1"
-                          placeholder="Or enter product name manually"
+                          placeholder="or type name"
                           value={item.product_name}
-                          onChange={(e) => updateLineItem(index, 'product_name', e.target.value)}
+                          onChange={e => updateLineItem(index, 'product_name', e.target.value)}
                         />
                       </TableCell>
+
                       <TableCell>
                         <Input
                           value={item.description}
-                          onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                          placeholder="Description"
+                          onChange={e => updateLineItem(index, 'description', e.target.value)}
+                          placeholder="Desc"
                         />
                       </TableCell>
+
                       <TableCell>
                         <Input
                           type="number"
                           min="1"
+                          className="w-20"
                           value={item.quantity}
-                          onChange={(e) => updateLineItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                          onChange={e => updateLineItem(index, 'quantity', parseInt(e.target.value) || 1)}
                         />
                       </TableCell>
+
                       <TableCell>
                         <Input
                           type="number"
-                          min="0"
                           step="0.01"
+                          className="w-28"
                           value={item.unit_cost}
-                          onChange={(e) => updateLineItem(index, 'unit_cost', parseFloat(e.target.value) || 0)}
+                          onChange={e => updateLineItem(index, 'unit_cost', parseFloat(e.target.value) || 0)}
                         />
                       </TableCell>
-                      <TableCell>KES {item.total.toFixed(2)}</TableCell>
+
+                      <TableCell className="font-medium">
+                        KES {item.total.toFixed(2)}
+                      </TableCell>
+
+                      <TableCell>
+                        <Input
+                          type="date"
+                          className="w-full"
+                          value={item.expiry_date || ''}
+                          onChange={e => updateLineItem(index, 'expiry_date', e.target.value)}
+                        />
+                      </TableCell>
+
                       <TableCell>
                         {lineItems.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeLineItem(index)}
-                          >
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeLineItem(index)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
@@ -603,29 +520,26 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
                   ))}
                 </TableBody>
               </Table>
-              
-              {/* Totals */}
-              <div className="mt-4 flex justify-end">
-                <div className="w-80 space-y-3">
+
+              <div className="mt-6 flex justify-end">
+                <div className="w-80 space-y-2">
                   <div className="flex justify-between">
                     <span>Net Amount:</span>
                     <span>KES {totals.netAmount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <Label htmlFor="manual_tax">Tax (Manual Entry):</Label>
+                    <Label htmlFor="tax">Tax:</Label>
                     <Input
-                      id="manual_tax"
+                      id="tax"
                       type="number"
-                      min="0"
                       step="0.01"
                       value={manualTax}
-                      onChange={(e) => setManualTax(parseFloat(e.target.value) || 0)}
-                      className="w-40 text-right"
-                      placeholder="0.00"
+                      onChange={e => setManualTax(parseFloat(e.target.value) || 0)}
+                      className="w-32 text-right"
                     />
                   </div>
                   <div className="flex justify-between font-bold text-lg border-t pt-2">
-                    <span>Final Total:</span>
+                    <span>Total:</span>
                     <span>KES {totals.total.toFixed(2)}</span>
                   </div>
                 </div>
@@ -638,7 +552,7 @@ export const CreateSupplierInvoiceDialog: React.FC<CreateSupplierInvoiceDialogPr
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : (invoice ? 'Update' : 'Create') + ' Invoice'}
+              {isSubmitting ? 'Saving...' : invoice ? 'Update' : 'Create'} Invoice
             </Button>
           </div>
         </form>

@@ -3,7 +3,9 @@ import { Database } from '@/integrations/supabase/types';
 import { Product as FrontendProduct, UnitOfMeasure } from '@/types/product';
 
 // Types
-export type Product = Database['public']['Tables']['products']['Row'];
+export type Product = Database['public']['Tables']['products']['Row'] & {
+  expiry_queue?: string[] | null;
+};
 export type Supplier = Database['public']['Tables']['suppliers']['Row'];
 export type Sale = Database['public']['Tables']['sales']['Row'] & {
   sale_items?: SaleItem[];

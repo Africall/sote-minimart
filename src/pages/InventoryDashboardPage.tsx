@@ -11,6 +11,7 @@ import { TransferStockDialog } from '@/components/inventory/TransferStockDialog'
 import { convertToFrontendProduct } from '@/utils/inventoryHelpers';
 import { deleteProduct } from '@/utils/supabaseUtils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,35 +23,29 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// Helper function to safely handle barcode search
 const searchInBarcode = (barcode: string | string[] | undefined, searchQuery: string): boolean => {
   if (!barcode || !searchQuery) return false;
-  
   if (Array.isArray(barcode)) {
-    return barcode.some(code => 
-      typeof code === 'string' && code.toLowerCase().includes(searchQuery)
-    );
+    return barcode.some(code => typeof code === 'string' && code.toLowerCase().includes(searchQuery));
   }
-  
   return typeof barcode === 'string' && barcode.toLowerCase().includes(searchQuery);
 };
 
 const InventoryDashboardPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [addProductOpen, setAddProductOpen] = useState(false);
-  // RESTOCK STATE COMMENTED OUT FOR SAFETY
-  // const [restockOpen, setRestockOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<FrontendProduct | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<FrontendProduct | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [transferStockOpen, setTransferStockOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const {
     products,
     lowStockItems,
-    expiringItems,
+    expiringItems: rawExpiringItems,
     inventoryValue,
     loading,
     fetchInventoryData
@@ -60,91 +55,245 @@ const InventoryDashboardPage = () => {
     actionLoading,
     handleAddProduct,
     handleEditProduct,
-    // RESTOCK HANDLER COMMENTED OUT FOR SAFETY
-    // handleRestock,
     handleMarkExpired
   } = useInventoryActions(fetchInventoryData);
 
+  // FETCH EXPIRING ITEMS WITH expiry_queue
+  const [expiringItems, setExpiringItems] = useState<FrontendProduct[]>([]);
+
+  const fetchExpiringItems = async () => {
+    console.log('=== FETCH EXPIRING ITEMS START ===');
+    setRefreshing(true);
+    try {
+      console.log('DEBUG: Starting fetch of expiring items...');
+      console.log('DEBUG: Querying products where expiry_queue is NOT null');
+      
+      const { data, error } = await supabase
+        .from('products')
+        .select('*');
+
+      console.log('DEBUG: After fetch all products:', {
+        error,
+        totalProducts: data?.length
+      });
+
+      if (error) {
+        console.error('DEBUG: Supabase error:', error);
+        toast.error("Failed to load expiring items");
+        setExpiringItems([]);
+        return;
+      }
+
+      console.log('DEBUG: All products from DB:', data?.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        expiry_queue: p.expiry_queue,
+        hasExpiry: !!p.expiry_queue
+      })));
+
+      // Calculate date 30 days from now
+      const today = new Date();
+      const thirtyDaysFromNow = new Date(today);
+      thirtyDaysFromNow.setDate(today.getDate() + 30);
+
+      console.log('DEBUG: Filtering for items expiring within 30 days:', {
+        today: today.toISOString(),
+        thirtyDaysFromNow: thirtyDaysFromNow.toISOString()
+      });
+
+      // Filter products with expiry_queue that expire within 30 days
+      const productsWithExpiry = (data || []).filter((p: any) => {
+        const queue = p.expiry_queue;
+        const hasQueue = Array.isArray(queue) && queue.length > 0;
+        
+        if (!hasQueue) return false;
+
+        // Sort the queue to find the nearest date to today
+        const sortedQueue = [...queue].sort((a, b) => {
+          return new Date(a).getTime() - new Date(b).getTime();
+        });
+
+        // Find the nearest expiry date (closest to today, not necessarily first)
+        const nearestExpiry = sortedQueue.find((date: string) => {
+          const expiryDate = new Date(date);
+          return expiryDate >= today;
+        });
+
+        if (!nearestExpiry) return false;
+
+        const expiryDate = new Date(nearestExpiry);
+        const isExpiringSoon = expiryDate <= thirtyDaysFromNow && expiryDate >= today;
+
+        if (hasQueue) {
+          console.log(`DEBUG: Product ${p.name}:`, {
+            expiry_queue: queue,
+            sortedQueue,
+            nearestExpiry,
+            expiryDate: expiryDate.toISOString(),
+            isExpiringSoon
+          });
+        }
+
+        return isExpiringSoon;
+      });
+      
+      console.log('DEBUG: After filtering - products expiring within 30 days:', {
+        count: productsWithExpiry.length,
+        products: productsWithExpiry.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          expiry_queue: p.expiry_queue
+        }))
+      });
+
+      // Sort products by their nearest expiry date
+      productsWithExpiry.sort((a, b) => {
+        const queueA = (a as any).expiry_queue || [];
+        const queueB = (b as any).expiry_queue || [];
+        
+        // Find nearest date for product A
+        const sortedA = [...queueA].sort((x: string, y: string) => 
+          new Date(x).getTime() - new Date(y).getTime()
+        );
+        const nearestA = sortedA.find((date: string) => new Date(date) >= today);
+        
+        // Find nearest date for product B
+        const sortedB = [...queueB].sort((x: string, y: string) => 
+          new Date(x).getTime() - new Date(y).getTime()
+        );
+        const nearestB = sortedB.find((date: string) => new Date(date) >= today);
+        
+        if (!nearestA || !nearestB) return 0;
+        return new Date(nearestA).getTime() - new Date(nearestB).getTime();
+      });
+
+      const converted = productsWithExpiry.map((p: any) => convertToFrontendProduct(p));
+      console.log('DEBUG: After conversion:', {
+        count: converted.length,
+        samples: converted.map(p => ({
+          id: p.id,
+          name: p.name,
+          expiry_queue: p.expiry_queue,
+          expiryDate: p.expiryDate
+        }))
+      });
+      
+      setExpiringItems(converted);
+      console.log('=== FETCH EXPIRING ITEMS END - Items set:', converted.length, '===');
+    } catch (err) {
+      console.error("DEBUG: Fetch error:", err);
+      toast.error("Failed to load expiring items");
+      setExpiringItems([]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     fetchInventoryData();
+    fetchExpiringItems();
   }, [fetchInventoryData]);
 
-  // Enhanced search filter with safe barcode handling
+  // REFRESH BOTH LISTS
+  const handleRefresh = () => {
+    fetchInventoryData();
+    fetchExpiringItems();
+  };
+
+  // MARK AS SORTED
+  const handleMarkSorted = async (productId: string) => {
+    setRefreshing(true);
+    try {
+      const { data: product, error: fetchError } = await supabase
+        .from('products')
+        .select('expiry_queue')
+        .eq('id', productId)
+        .single();
+
+      if (fetchError || !product) {
+        toast.error("Failed to fetch product");
+        return;
+      }
+
+      const currentQueue = Array.isArray((product as any).expiry_queue) 
+        ? (product as any).expiry_queue 
+        : [];
+      
+      const newQueue = currentQueue.slice(1);
+
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({
+          expiry_queue: newQueue
+        } as any)
+        .eq('id', productId);
+
+      if (updateError) {
+        toast.error("Failed to update expiry queue");
+        return;
+      }
+
+      toast.success("Sorted! Next batch ready.");
+      handleRefresh();
+    } catch (error) {
+      toast.error("Failed to mark as sorted");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // FILTERING
   const filteredProducts = products.filter(product => {
-    const searchLower = searchQuery.toLowerCase().trim();
-    if (!searchLower) return true;
-    
-    const nameMatch = product.name.toLowerCase().includes(searchLower);
-    const barcodeMatch = searchInBarcode(product.barcode, searchLower);
-    const categoryMatch = product.category.toLowerCase().includes(searchLower);
-    
-    return nameMatch || barcodeMatch || categoryMatch;
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      product.name.toLowerCase().includes(q) ||
+      searchInBarcode(product.barcode, q) ||
+      product.category.toLowerCase().includes(q)
+    );
   });
 
-  // Convert expiring items to frontend products for consistent handling
-  const convertedExpiringItems = expiringItems.map(convertToFrontendProduct);
+  const filteredLowStockItems = lowStockItems.filter(product => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      product.name.toLowerCase().includes(q) ||
+      searchInBarcode(product.barcode, q) ||
+      product.category.toLowerCase().includes(q)
+    );
+  });
 
-  // Handle delete product with improved error handling
+  const filteredExpiringItems = expiringItems.filter(product => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      product.name.toLowerCase().includes(q) ||
+      searchInBarcode(product.barcode, q) ||
+      product.category.toLowerCase().includes(q)
+    );
+  });
+
   const handleDeleteProduct = async () => {
-    if (!productToDelete) {
-      toast.error('No product selected for deletion');
-      return;
-    }
-    
+    if (!productToDelete) return;
     setIsDeleting(true);
-    
     try {
-      console.log('Deleting product:', productToDelete.id, productToDelete.name);
-      
       await deleteProduct(productToDelete.id);
-      
-      toast.success(`"${productToDelete.name}" has been deleted successfully`);
-      
-      // Refresh the inventory list
-      await fetchInventoryData();
-      
-      // Close dialog and clear state
+      toast.success(`"${productToDelete.name}" deleted`);
+      handleRefresh();
       setDeleteDialogOpen(false);
       setProductToDelete(null);
     } catch (error: any) {
-      console.error('Error deleting product:', error);
-      toast.error(error?.message || 'Failed to delete product. Please try again.');
+      toast.error(error.message || "Delete failed");
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // Filter low stock items based on search query with safe barcode handling
-  const filteredLowStockItems = lowStockItems.filter(product => {
-    const searchLower = searchQuery.toLowerCase().trim();
-    if (!searchLower) return true;
-    
-    return (
-      product.name.toLowerCase().includes(searchLower) ||
-      searchInBarcode(product.barcode, searchLower) ||
-      product.category.toLowerCase().includes(searchLower)
-    );
-  });
-
-  // Filter expiring items based on search query with safe barcode handling
-  const filteredExpiringItems = convertedExpiringItems.filter(product => {
-    const searchLower = searchQuery.toLowerCase().trim();
-    if (!searchLower) return true;
-    
-    return (
-      product.name.toLowerCase().includes(searchLower) ||
-      searchInBarcode(product.barcode, searchLower) ||
-      product.category.toLowerCase().includes(searchLower)
-    );
-  });
-
-  // Handle delete action from product card
   const handleDeleteClick = (product: FrontendProduct) => {
-    console.log('Delete clicked for product:', product.id, product.name);
     setProductToDelete(product);
     setDeleteDialogOpen(true);
   };
-  
+
   return (
     <div className="space-y-6">
       <InventoryHeader
@@ -158,58 +307,46 @@ const InventoryDashboardPage = () => {
       <InventoryStats
         inventoryValue={inventoryValue}
         lowStockItems={lowStockItems}
-        expiringItems={convertedExpiringItems}
-        loading={loading}
+        expiringItems={expiringItems}
+        loading={loading || refreshing}
       />
 
       <InventoryTabs
         filteredProducts={filteredProducts}
         lowStockItems={filteredLowStockItems}
         expiringItems={filteredExpiringItems}
-        loading={loading}
-        // RESTOCK HANDLER COMMENTED OUT FOR SAFETY
-        // onRestock={(product) => {
-        //   setSelectedProduct(product);
-        //   setRestockOpen(true);
-        // }}
+        loading={loading || refreshing}
         onRestock={() => {}}
         onEdit={(product) => {
           setSelectedProduct(product);
           setEditOpen(true);
         }}
         onDelete={handleDeleteClick}
-        onMarkExpired={(productId) => handleMarkExpired(productId, products)}
+        onRefresh={handleRefresh}
       />
 
       <InventoryDialogs
         addProductOpen={addProductOpen}
         editOpen={editOpen}
-        // RESTOCK PROPS COMMENTED OUT FOR SAFETY
-        // restockOpen={restockOpen}
         restockOpen={false}
         selectedProduct={selectedProduct}
         actionLoading={actionLoading}
         onAddProductOpenChange={setAddProductOpen}
         onEditOpenChange={setEditOpen}
-        // onRestockOpenChange={setRestockOpen}
         onRestockOpenChange={() => {}}
         onAddProduct={handleAddProduct}
         onEditProduct={handleEditProduct}
-        // onRestock={handleRestock}
         onRestock={async () => {}}
         onSelectedProductChange={setSelectedProduct}
       />
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Product?</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete <strong>"{productToDelete?.name}"</strong>?
-              <br /><br />
-              This action cannot be undone. The product will be permanently removed from your inventory.
-              All sales history and related data will remain intact.
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -217,19 +354,18 @@ const InventoryDashboardPage = () => {
             <AlertDialogAction 
               onClick={handleDeleteProduct} 
               disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground"
             >
-              {isDeleting ? 'Deleting...' : 'Delete Product'}
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Transfer Stock Dialog */}
       <TransferStockDialog
         open={transferStockOpen}
         onOpenChange={setTransferStockOpen}
-        onTransferComplete={fetchInventoryData}
+        onTransferComplete={handleRefresh}
       />
     </div>
   );

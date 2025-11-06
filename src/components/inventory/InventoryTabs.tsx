@@ -1,9 +1,11 @@
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Product as FrontendProduct } from '@/types/product';
 import { ProductGrid } from './ProductGrid';
 import { LowStockTable } from './LowStockTable';
 import ExpiringItemsTable from './ExpiringItemsTable';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 interface InventoryTabsProps {
   filteredProducts: FrontendProduct[];
@@ -13,7 +15,7 @@ interface InventoryTabsProps {
   onRestock: (product: FrontendProduct) => void;
   onEdit: (product: FrontendProduct) => void;
   onDelete?: (product: FrontendProduct) => void;
-  onMarkExpired: (productId: string) => void;
+  onRefresh: () => void; // ← NEW: refresh parent
 }
 
 export const InventoryTabs = ({
@@ -24,8 +26,43 @@ export const InventoryTabs = ({
   onRestock,
   onEdit,
   onDelete,
-  onMarkExpired
+  onRefresh
 }: InventoryTabsProps) => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleMarkSorted = async (productId: string) => {
+    setRefreshing(true);
+    try {
+      const { data: product } = await supabase
+        .from('products')
+        .select('expiry_queue')
+        .eq('id', productId)
+        .single();
+
+      const newQueue = product?.expiry_queue?.slice(1) || [];
+
+      await supabase
+        .from('products')
+        .update({ expiry_queue: newQueue })
+        .eq('id', productId);
+
+      toast({
+        title: "Sorted!",
+        description: "Expiry removed. Next batch ready.",
+      });
+
+      onRefresh(); // ← Triggers parent re-fetch
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to mark as sorted",
+        variant: "destructive",
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <Tabs defaultValue="all" className="space-y-4">
       <TabsList>
@@ -51,7 +88,7 @@ export const InventoryTabs = ({
       <TabsContent value="all" className="space-y-4">
         {filteredProducts.length === 0 && !loading ? (
           <div className="text-center py-8">
-            <p className="text-muted-foreground">No products found matching your search criteria</p>
+            <p className="text-muted-foreground">No products found</p>
           </div>
         ) : (
           <ProductGrid
@@ -67,7 +104,7 @@ export const InventoryTabs = ({
       <TabsContent value="low-stock" className="space-y-4">
         {lowStockItems.length === 0 && !loading ? (
           <div className="text-center py-8">
-            <p className="text-muted-foreground">No low stock items found matching your search criteria</p>
+            <p className="text-muted-foreground">No low stock items</p>
           </div>
         ) : (
           <ProductGrid
@@ -83,13 +120,16 @@ export const InventoryTabs = ({
       <TabsContent value="expiring" className="space-y-4">
         {expiringItems.length === 0 && !loading ? (
           <div className="text-center py-8">
-            <p className="text-muted-foreground">No expiring items found matching your search criteria</p>
+            <p className="text-muted-foreground">
+              No expiring items. You're all clear!
+            </p>
           </div>
         ) : (
           <ExpiringItemsTable
             products={expiringItems}
-            loading={loading}
-            onMarkExpired={onMarkExpired}
+            loading={loading || refreshing}
+            onMarkExpired={handleMarkSorted}
+            onRefresh={onRefresh}
           />
         )}
       </TabsContent>

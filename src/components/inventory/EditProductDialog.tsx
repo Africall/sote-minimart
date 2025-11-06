@@ -46,6 +46,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
   const { profile } = useAuth();
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined);
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [expiryQueue, setExpiryQueue] = useState<string[]>([]);
 
   // Determine user permissions
   const isAdmin = profile?.role === 'admin';
@@ -66,30 +67,82 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
     }
   });
 
-  // Load product data when dialog opens
+  // Load product data when dialog opens - fetch fresh data from database
   useEffect(() => {
-    if (open && product) {
-      console.log('EditProductDialog: Loading product data:', {
-        productId: product.id,
-        name: product.name,
-        imageUrl: product.image_url,
-        userRole: profile?.role
-      });
+    const fetchProductData = async () => {
+      if (open && product) {
+        console.log('EditProductDialog: Loading product data:', {
+          productId: product.id,
+          name: product.name,
+          imageUrl: product.image_url,
+          userRole: profile?.role
+        });
 
-      form.reset({
-        name: product.name || '',
-        category: product.category || 'personal-care',
-        cost: product.buyingPrice?.toString() || '0',
-        price: product.sellingPrice?.toString() || '0',
-        reorder_level: product.reorderLevel?.toString() || '10',
-        stock_quantity: product.quantity?.toString() || '0',
-        sku: product.barcode || '',
-        barcode: product.barcode || '',
-      });
-      
-      setExpiryDate(product.expiryDate ? new Date(product.expiryDate) : undefined);
-      setImageUrl(product.image_url || '');
-    }
+        // Reset form with current product data
+        form.reset({
+          name: product.name || '',
+          category: product.category || 'personal-care',
+          cost: product.buyingPrice?.toString() || '0',
+          price: product.sellingPrice?.toString() || '0',
+          reorder_level: product.reorderLevel?.toString() || '10',
+          stock_quantity: product.quantity?.toString() || '0',
+          sku: product.barcode || '',
+          barcode: product.barcode || '',
+        });
+        
+        setImageUrl(product.image_url || '');
+
+        // Fetch fresh expiry_queue data from database
+        try {
+          const { supabase } = await import('@/integrations/supabase/client');
+          const { data: freshProduct, error } = await supabase
+            .from('products')
+            .select('expiry_queue, expiry_date')
+            .eq('id', product.id)
+            .single();
+
+          if (error || !freshProduct) {
+            console.error('Failed to fetch expiry_queue:', error);
+            // Fallback to product data passed in props
+            setExpiryDate(product.expiryDate ? new Date(product.expiryDate) : undefined);
+            setExpiryQueue(product.expiry_queue || []);
+          } else {
+            // Use fresh data from database - cast to any to handle dynamic columns
+            const productData = freshProduct as any;
+            const queue = Array.isArray(productData.expiry_queue) ? productData.expiry_queue : [];
+            setExpiryQueue(queue);
+            
+            // Find the nearest expiry date (closest to today, not FIFO)
+            const today = new Date();
+            const sortedQueue = [...queue].sort((a: string, b: string) => {
+              return new Date(a).getTime() - new Date(b).getTime();
+            });
+            
+            // Find the nearest date that's >= today
+            const nearestExpiry = sortedQueue.find((date: string) => {
+              const expiryDate = new Date(date);
+              return expiryDate >= today;
+            }) || sortedQueue[sortedQueue.length - 1] || productData.expiry_date;
+            
+            setExpiryDate(nearestExpiry ? new Date(nearestExpiry) : undefined);
+            
+            console.log('EditProductDialog: Fetched expiry_queue:', {
+              productId: product.id,
+              expiry_queue: queue,
+              sortedQueue,
+              nearestExpiry: nearestExpiry
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching expiry_queue:', err);
+          // Fallback to product data passed in props
+          setExpiryDate(product.expiryDate ? new Date(product.expiryDate) : undefined);
+          setExpiryQueue(product.expiry_queue || []);
+        }
+      }
+    };
+
+    fetchProductData();
   }, [open, product, form, profile?.role]);
 
   // Handle image URL changes - separate from stock operations
@@ -168,9 +221,8 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
         }
       }
 
-      // All users with edit permission can edit expiry dates and images
+      // All users with edit permission can edit images (expiry dates are read-only)
       if (isAdmin || isInventory || isCashier) {
-        updateData.expiry_date = expiryDate?.toISOString() || null;
         updateData.image_url = imageUrl?.trim() || null;
       }
 
@@ -438,41 +490,33 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
                 </FormItem>
               )}
               
-              {/* Expiry date - available to admin, inventory, and cashiers */}
-              <FormItem>
-                <FormLabel>Expiry Date (Optional)</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full pl-3 text-left font-normal",
-                          !expiryDate && "text-muted-foreground"
-                        )}
-                      >
-                        {expiryDate ? (
-                          format(expiryDate, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={expiryDate}
-                      onSelect={setExpiryDate}
-                      disabled={(date) =>
-                        date < new Date()
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </FormItem>
+              {/* Expiry date - read-only display from expiry_queue */}
+              <div className="md:col-span-2">
+                <FormItem>
+                  <FormLabel>Expiry Date (Read-Only)</FormLabel>
+                  {expiryQueue.length > 0 && (
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Showing nearest expiry from queue ({expiryQueue.length} batch{expiryQueue.length > 1 ? 'es' : ''} total)
+                    </p>
+                  )}
+                  <div className="p-3 bg-muted rounded-md border">
+                    <div className="flex items-center space-x-2">
+                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">
+                        {expiryDate ? format(expiryDate, "PPP") : "No expiry date set"}
+                      </span>
+                    </div>
+                  </div>
+                  {expiryQueue.length > 1 && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      <strong>Other batches:</strong> {expiryQueue.slice(1).map(date => format(new Date(date), "MMM d, yyyy")).join(', ')}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Expiry dates are managed through the expiry queue system
+                  </p>
+                </FormItem>
+              </div>
             </div>
             
             <div className="flex gap-2 justify-end">

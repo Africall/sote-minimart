@@ -36,7 +36,8 @@ export interface Product {
   taxRate: number;
   supplier?: string;
   barcode?: string;
-  image_url?: string; // Use consistent database field name
+  image_url?: string; // Use consistent database field name'
+  expiry_queue?: string[] | null;
   receivedDate?: string;
   expiryDate?: string;
   reorderLevel?: number;

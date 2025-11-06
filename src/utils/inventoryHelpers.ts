@@ -2,6 +2,23 @@
 import { Product } from '@/utils/supabaseUtils';
 import { Product as FrontendProduct, ProductCategory, UnitOfMeasure } from '@/types/product';
 
+// Add this type — it matches your REAL database
+interface DBProduct {
+  id: string;
+  name: string;
+  stock_quantity: number;
+  price: number;
+  cost: number;
+  category: string;
+  barcode: string | string[] | null;
+  expiry_queue?: string[] | null;
+  expiry_date?: string | null;
+  image_url?: string | null;
+  created_at?: string | null;
+  reorder_level?: number | null;
+  is_featured?: boolean | null;
+}
+
 // Helper function to safely convert barcode array to string
 const convertBarcodeToString = (barcode: string | string[] | null | undefined): string | undefined => {
   if (!barcode) return undefined;
@@ -15,23 +32,56 @@ const convertBarcodeToString = (barcode: string | string[] | null | undefined): 
   return typeof barcode === 'string' && barcode.trim().length > 0 ? barcode : undefined;
 };
 
+
+
 // Helper function to convert database Product to FrontendProduct with safe defaults
-export const convertToFrontendProduct = (product: Partial<Product>): FrontendProduct => {
+export const convertToFrontendProduct = (product: any): FrontendProduct => {
+  // Log raw product data for debugging
+  console.log('convertToFrontendProduct - Raw product from DB:', {
+    id: product.id,
+    name: product.name,
+    expiry_queue: product.expiry_queue,
+    expiry_date: product.expiry_date
+  });
+
+  // Safely extract expiry_queue
+  const expiryQueue = Array.isArray(product.expiry_queue) ? product.expiry_queue : [];
+  
+  // Find the nearest expiry date (closest to today, not FIFO)
+  const today = new Date();
+  const sortedQueue = [...expiryQueue].sort((a, b) => {
+    return new Date(a).getTime() - new Date(b).getTime();
+  });
+  
+  // Find the nearest date that's >= today
+  const nextExpiryDate = sortedQueue.find((date: string) => {
+    const expiryDate = new Date(date);
+    return expiryDate >= today;
+  }) || sortedQueue[sortedQueue.length - 1] || product.expiry_date || undefined;
+
+  console.log('convertToFrontendProduct - Processed:', {
+    id: product.id,
+    expiry_queue: expiryQueue,
+    sortedQueue,
+    nextExpiryDate: nextExpiryDate
+  });
+
   return {
     id: product.id || '',
     name: product.name || '',
-    brand: product.name || '', // Use name as brand since database doesn't have brand field
-    quantity: product.stock_quantity || 0,
+    brand: product.name || '',
+    quantity: product.stock_quantity || product.quantity || 0,
     unitOfMeasure: 'piece' as UnitOfMeasure,
     buyingPrice: product.cost || 0,
-    sellingPrice: product.price || 0,
+    sellingPrice: product.price || product.sellingPrice || 0,
     category: (product.category || 'personal-care') as ProductCategory,
     taxRate: 16,
     supplier: undefined,
     barcode: convertBarcodeToString(product.barcode),
     image_url: product.image_url || undefined,
     receivedDate: product.created_at || undefined,
-    expiryDate: product.expiry_date || undefined,
+    expiry_queue: expiryQueue,
+    expiryDate: nextExpiryDate,
     reorderLevel: product.reorder_level || 10,
     inventoryAge: undefined,
     packSize: undefined,
