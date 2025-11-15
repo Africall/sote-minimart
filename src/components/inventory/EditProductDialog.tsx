@@ -9,7 +9,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Save } from 'lucide-react';
+import { CalendarIcon, Plus, Save } from 'lucide-react';
 import { ProductImageUpload } from './ProductImageUpload';
 import { toast } from 'sonner';
 import { Product } from '@/utils/supabaseUtils';
@@ -47,6 +47,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined);
   const [imageUrl, setImageUrl] = useState<string>('');
   const [expiryQueue, setExpiryQueue] = useState<string[]>([]);
+  const [newExpiryDate, setNewExpiryDate] = useState<Date | undefined>(undefined);
 
   // Determine user permissions
   const isAdmin = profile?.role === 'admin';
@@ -153,6 +154,52 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
       userRole: profile?.role
     });
     setImageUrl(url);
+  };
+
+  const handleAddExpiryDate = async () => {
+    if (!product || !newExpiryDate) {
+      toast.error('Please select a date to add.');
+      return;
+    }
+
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Fetch the current queue
+      const { data: currentProduct, error: fetchError } = await supabase
+        .from('products')
+        .select('expiry_queue')
+        .eq('id', product.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const currentQueue = (currentProduct as any).expiry_queue || [];
+      const formattedDate = format(newExpiryDate, 'yyyy-MM-dd');
+      
+      // Prevent adding duplicate dates
+      if (currentQueue.includes(formattedDate)) {
+        toast.info('This expiry date is already in the queue.');
+        return;
+      }
+
+      const newQueue = [...currentQueue, formattedDate];
+
+      // Update the product with the new queue
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({ expiry_queue: newQueue } as any)
+        .eq('id', product.id);
+
+      if (updateError) throw updateError;
+
+      toast.success('Expiry date added to the queue.');
+      setExpiryQueue(newQueue); // Update local state to reflect change
+      setNewExpiryDate(undefined); // Reset the date picker
+    } catch (error: any) {
+      console.error('Failed to add expiry date:', error);
+      toast.error(error.message || 'Failed to add expiry date.');
+    }
   };
 
   const handleSubmit = async (data: FormValues) => {
@@ -493,7 +540,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
               {/* Expiry date - read-only display from expiry_queue */}
               <div className="md:col-span-2">
                 <FormItem>
-                  <FormLabel>Expiry Date (Read-Only)</FormLabel>
+                  <FormLabel>Expiry Dates</FormLabel>
                   {expiryQueue.length > 0 && (
                     <p className="text-xs text-muted-foreground mb-2">
                       Showing nearest expiry from queue ({expiryQueue.length} batch{expiryQueue.length > 1 ? 'es' : ''} total)
@@ -507,14 +554,49 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
                       </span>
                     </div>
                   </div>
-                  {expiryQueue.length > 1 && (
+                  {expiryQueue.length > 0 && (
                     <p className="text-xs text-muted-foreground mt-2">
-                      <strong>Other batches:</strong> {expiryQueue.slice(1).map(date => format(new Date(date), "MMM d, yyyy")).join(', ')}
+                      <strong>All batches:</strong> {expiryQueue.map(date => format(new Date(date), "MMM d, yyyy")).join(', ')}
                     </p>
                   )}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Expiry dates are managed through the expiry queue system
-                  </p>
+                  
+                  {/* Add to expiry queue - only for admins */}
+                  {isAdmin && (
+                    <div className="mt-4 pt-4 border-t">
+                      <FormLabel className="text-sm font-medium">Add to Expiry Queue</FormLabel>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant={'outline'}
+                              className={cn(
+                                "flex-1 justify-start text-left font-normal",
+                                !newExpiryDate && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {newExpiryDate ? format(newExpiryDate, "PPP") : <span>Pick a date</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={newExpiryDate}
+                              onSelect={setNewExpiryDate}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <Button type="button" onClick={handleAddExpiryDate} disabled={!newExpiryDate}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add to Queue
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        This will add a new expiry date to the product's queue.
+                      </p>
+                    </div>
+                  )}
                 </FormItem>
               </div>
             </div>
