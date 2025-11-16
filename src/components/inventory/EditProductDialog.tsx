@@ -9,7 +9,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Plus, Save } from 'lucide-react';
+import { CalendarIcon, Plus, Save, Trash2 } from 'lucide-react';
 import { ProductImageUpload } from './ProductImageUpload';
 import { toast } from 'sonner';
 import { Product } from '@/utils/supabaseUtils';
@@ -202,6 +202,35 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
     }
   };
 
+  const handleDeleteExpiryDate = async (dateToDelete: string) => {
+    if (!product) return;
+
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Optimistic UI update
+      const originalQueue = expiryQueue;
+      const newQueue = expiryQueue.filter(d => d !== dateToDelete);
+      setExpiryQueue(newQueue);
+
+      const { error } = await supabase
+        .from('products')
+        .update({ expiry_queue: newQueue } as any)
+        .eq('id', product.id);
+
+      if (error) {
+        // Revert on failure
+        setExpiryQueue(originalQueue);
+        throw error;
+      }
+
+      toast.success('Expiry date removed from queue.');
+    } catch (error: any) {
+      console.error('Failed to delete expiry date:', error);
+      toast.error(error.message || 'Failed to remove expiry date.');
+    }
+  };
+
   const handleSubmit = async (data: FormValues) => {
     if (!product) {
       console.error('EditProductDialog: No product selected for update');
@@ -260,7 +289,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
         updateData.price = price;
         updateData.reorder_level = reorderLevel;
         updateData.sku = skuValue?.trim() || null;
-        updateData.barcode = barcodeValue?.trim() ? [barcodeValue.trim()] : null;
+        updateData.barcode = barcodeValue?.trim() ? [barcodeValue.trim()] : [];
         
         // Only admins can update stock quantity
         if (isAdmin) {
@@ -554,12 +583,30 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
                       </span>
                     </div>
                   </div>
-                  {expiryQueue.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      <strong>All batches:</strong> {expiryQueue.map(date => format(new Date(date), "MMM d, yyyy")).join(', ')}
-                    </p>
-                  )}
                   
+                  {/* Expiry queue list with delete buttons */}
+                  {isAdmin && expiryQueue.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <FormLabel className="text-sm font-medium">Expiry Queue Management</FormLabel>
+                      <div className="max-h-32 overflow-y-auto rounded-md border p-2">
+                        {expiryQueue.map((date) => (
+                          <div key={date} className="flex items-center justify-between p-1.5 hover:bg-muted rounded-md">
+                            <span className="text-sm">{format(new Date(date), "MMM d, yyyy")}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => handleDeleteExpiryDate(date)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Add to expiry queue - only for admins */}
                   {isAdmin && (
                     <div className="mt-4 pt-4 border-t">
