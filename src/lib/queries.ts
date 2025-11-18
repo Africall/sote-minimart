@@ -7,6 +7,8 @@ import { Database } from '@/types/database';
 type ProductRow = Database['public']['Tables']['products']['Row'];
 type DailyStatsRow = Database['public']['Tables']['daily_stats']['Row'];
 type HeldTransactionRow = Database['public']['Tables']['held_transactions']['Row'];
+type SaleRow = Database['public']['Tables']['sales']['Row'];
+type SaleItemRow = Database['public']['Tables']['sale_items']['Row'];
 
 // Query keys
 export const QUERY_KEYS = {
@@ -56,15 +58,19 @@ const fetchQuickItems = async () => {
 
 const fetchDailyStats = async (cashierId?: string) => {
   const today = new Date().toISOString().split('T')[0];
-  
+  console.log(`Fetching daily stats for date: ${today} and cashierId: ${cashierId}`);
+
   // Get daily stats
-  const { data: dailyStatsData, error: dailyStatsError } = await supabase
+  const { data: dailyStatsData, error: dailyStatsError } = (await supabase
     .from('daily_stats')
     .select('*')
-    .eq('date', today)
-    .maybeSingle();
+    .eq('date', today)) as { data: DailyStatsRow[] | null; error: any };
   
-  if (dailyStatsError) throw dailyStatsError;
+  if (dailyStatsError) {
+    console.error('Error fetching daily_stats:', dailyStatsError);
+    throw dailyStatsError;
+  }
+  console.log('Fetched daily_stats data:', dailyStatsData);
 
   // Get cashier-specific sales for today
   let cashierSales = 0;
@@ -72,33 +78,45 @@ const fetchDailyStats = async (cashierId?: string) => {
   let itemsSold = 0;
 
   if (cashierId) {
-    const { data: salesData, error: salesError } = await supabase
+    const { data: salesData, error: salesError } = (await supabase
       .from('sales')
       .select('total_amount')
       .eq('cashier_id', cashierId)
       .gte('created_at', today + 'T00:00:00')
-      .lt('created_at', today + 'T23:59:59');
+      .lt('created_at', today + 'T23:59:59')) as { data: Pick<SaleRow, 'total_amount'>[] | null; error: any };
 
-    if (!salesError && salesData) {
-      cashierSales = salesData.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
-      totalTransactions = salesData.length;
+    if (salesError) {
+      console.error('Error fetching sales data:', salesError);
+    } else {
+      console.log('Fetched sales data:', salesData);
+      if (salesData) {
+        cashierSales = salesData.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
+        totalTransactions = salesData.length;
+      }
     }
 
     // Get items sold by cashier today
-    const { data: itemsData, error: itemsError } = await supabase
+    const { data: itemsData, error: itemsError } = (await supabase
       .from('sale_items')
       .select('quantity, sales!inner(cashier_id, created_at)')
       .eq('sales.cashier_id', cashierId)
       .gte('sales.created_at', today + 'T00:00:00')
-      .lt('sales.created_at', today + 'T23:59:59');
+      .lt('sales.created_at', today + 'T23:59:59')) as { data: Pick<SaleItemRow, 'quantity'>[] | null; error: any };
 
-    if (!itemsError && itemsData) {
-      itemsSold = itemsData.reduce((sum, item) => sum + item.quantity, 0);
+    if (itemsError) {
+      console.error('Error fetching sale_items data:', itemsError);
+    } else {
+      console.log('Fetched sale_items data:', itemsData);
+      if (itemsData) {
+        itemsSold = itemsData.reduce((sum, item) => sum + item.quantity, 0);
+      }
     }
   }
 
-  return {
-    totalSales: cashierSales || dailyStatsData?.total_sales || 0,
+  const dailyTotalFromStats = dailyStatsData ? dailyStatsData.reduce((sum, stat) => sum + Number(stat.total_sales), 0) : 0;
+
+  const finalStats = {
+    totalSales: cashierSales || dailyTotalFromStats || 0,
     totalTransactions,
     averageTransaction: totalTransactions > 0 ? cashierSales / totalTransactions : 0,
     itemsSold,
@@ -106,6 +124,9 @@ const fetchDailyStats = async (cashierId?: string) => {
     shiftStart: '',
     shiftEnd: ''
   };
+
+  console.log('Final daily stats:', finalStats);
+  return finalStats;
 };
 
 const fetchHeldTransactions = async () => {
